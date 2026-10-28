@@ -234,7 +234,7 @@ const movement = defineSystem({
   // Runs once in schedule.init(): decode the module, give it the engine memory, keep its exports.
   kernels: async (memory): Promise<Kernels> => {
     try {
-      const exports = await loadWasm("/movement.wasm", memory);
+      const exports = await loadWasm("/example/movement.wasm", memory);
       wasmExports = exports;
       wasmReady = true;
       return {
