@@ -2,48 +2,53 @@ name: Deploy Vite to GitHub Pages
 
 on:
   push:
-    branches: ["main"]
-  workflow_dispatch:
+    branches: [ "main" ] # Триггер срабатывает при пуше в ветку main
+  workflow_dispatch: # Позволяет запускать воркфлоу вручную из вкладки Actions
 
+# Права доступа, необходимые для публикации на GitHub Pages
 permissions:
   contents: read
   pages: write
   id-token: write
 
+# Предотвращает одновременные запуски деплоя, чтобы не было конфликтов
 concurrency:
   group: "pages"
   cancel-in-progress: true
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: \${{ steps.deployment.outputs.page_url }}
+  # --- Этап сборки ---
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: "npm"
+          node-version: 22 # Рекомендуется использовать актуальную LTS-версию Node.js
+          cache: 'npm' # Включает кэширование зависимостей для ускорения сборки
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci # Использует package-lock.json для чистой установки
 
-      - name: Build
-        run: npm run build
+      - name: Build with Vite
+        run: npm run build # Создает production-сборку в папке dist
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-
-      - name: Upload pages artifact
-        uses: actions/upload-pages-artifact@v2
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          path: "./dist"
+          path: ./dist # Путь к папке со собранными файлами
 
+  # --- Этап деплоя ---
+  deploy:
+    needs: build # Запускается только после успешного завершения job'а build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }} # URL опубликованной страницы
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v2
+        uses: actions/deploy-pages@v4
