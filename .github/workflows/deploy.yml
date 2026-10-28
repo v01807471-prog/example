@@ -27,7 +27,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22 # Рекомендуется использовать актуальную LTS-версию Node.js
+          node-version: 24 # Рекомендуется использовать актуальную LTS-версию Node.js
           cache: 'npm' # Включает кэширование зависимостей для ускорения сборки
 
       - name: Install dependencies
