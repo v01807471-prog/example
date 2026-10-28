@@ -1,0 +1,4107 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>3D Editor v46 — Import Fix & GC Delete</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #1e1e1e;
+        color: #d4d4d4;
+        font:
+          12px/1.4 "Segoe UI",
+          system-ui,
+          sans-serif;
+        overflow: hidden;
+      }
+      #app {
+        display: grid;
+        grid-template-rows: 34px 1fr 300px;
+        grid-template-columns: 240px 1fr 400px;
+        height: 100vh;
+      }
+      #toolbar {
+        grid-column: 1/4;
+        background: #252526;
+        border-bottom: 1px solid #3c3c3c;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 10px;
+      }
+      #toolbar strong {
+        color: #61afef;
+      }
+      #status {
+        margin-left: auto;
+        color: #666;
+        font-size: 11px;
+      }
+      #scene-tree-panel {
+        grid-column: 1;
+        background: #252526;
+        border-right: 1px solid #3c3c3c;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+      }
+      #scene-tree-panel .panel-title {
+        display: flex;
+        align-items: center;
+      }
+      #btn-add-node {
+        background: #0e639c;
+        color: #fff;
+        border: none;
+        padding: 0 8px;
+        margin-left: auto;
+        cursor: pointer;
+        font-size: 14px;
+        height: 18px;
+        border-radius: 2px;
+        line-height: 1;
+      }
+      #btn-add-node:hover {
+        background: #1177bb;
+      }
+      #viewport {
+        grid-column: 2;
+        background: #181818;
+        position: relative;
+        overflow: hidden;
+      }
+      #viewport canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      #inspector {
+        grid-column: 3;
+        background: #252526;
+        border-left: 1px solid #3c3c3c;
+        overflow-y: auto;
+        overflow-x: hidden;
+      }
+      #viewport.drag-over {
+        outline: 3px solid #007acc;
+        outline-offset: -3px;
+        background: #1a2c3a;
+        cursor: copy !important;
+      }
+      #scene-tree-panel.drag-over {
+        outline: 3px solid #007acc;
+        outline-offset: -3px;
+        background: #1a2c3a;
+        cursor: copy !important;
+      }
+      #bottom-panel {
+        grid-column: 1/4;
+        background: #252526;
+        border-top: 1px solid #3c3c3c;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+      .bottom-tabs {
+        display: flex;
+        background: #1e1e1e;
+        border-bottom: 1px solid #3c3c3c;
+        flex-shrink: 0;
+        align-items: center;
+      }
+      .bottom-tab {
+        padding: 6px 16px;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #888;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        user-select: none;
+      }
+      .bottom-tab:hover {
+        color: #bbb;
+      }
+      .bottom-tab.active {
+        color: #fff;
+        border-bottom-color: #0e639c;
+        background: #252526;
+      }
+      #btn-add-asset {
+        background: #0e639c;
+        color: #fff;
+        border: none;
+        margin-left: auto;
+        margin-right: 8px;
+        padding: 2px 10px;
+        cursor: pointer;
+        font-size: 12px;
+        border-radius: 2px;
+        line-height: 1.4;
+      }
+      #btn-add-asset:hover {
+        background: #1177bb;
+      }
+      .panel-view {
+        display: none;
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
+      }
+      .panel-view.active {
+        display: flex;
+      }
+      #assets-panel {
+        flex-direction: column;
+      }
+      #drop-zone {
+        padding: 4px;
+        text-align: center;
+        color: #666;
+        border: 1.5px dashed #3c3c3c;
+        margin: 4px 8px;
+        border-radius: 3px;
+        font-size: 11px;
+        flex-shrink: 0;
+      }
+      #drop-zone.dragover {
+        border-color: #007acc;
+        color: #007acc;
+        background: #1a2c3a;
+      }
+      .asset-toolbar {
+        display: flex;
+        gap: 6px;
+        padding: 3px 8px;
+        align-items: center;
+        font-size: 11px;
+        border-bottom: 1px solid #333;
+        background: #222;
+        flex-shrink: 0;
+        flex-wrap: wrap;
+      }
+      .filter-btn {
+        padding: 2px 8px;
+        background: #2d2d30;
+        border: 1px solid #3c3c3c;
+        border-radius: 2px;
+        cursor: pointer;
+        color: #aaa;
+        font-size: 10px;
+      }
+      .filter-btn.active {
+        background: #094771;
+        color: #fff;
+        border-color: #0e639c;
+      }
+      .asset-grid {
+        flex: 1;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, 78px);
+        grid-auto-rows: 88px;
+        gap: 6px;
+        padding: 6px 10px;
+        overflow-y: auto;
+        align-content: start;
+        min-height: 0;
+      }
+      .asset-item {
+        background: #2d2d30;
+        border: 1px solid #3c3c3c;
+        border-radius: 3px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-size: 9px;
+        cursor: grab;
+        overflow: hidden;
+        padding: 3px;
+        text-align: center;
+        position: relative;
+      }
+      .asset-item:hover {
+        border-color: #555;
+      }
+      .asset-item .asset-thumb {
+        width: 56px;
+        height: 56px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #1e1e1e;
+        border-radius: 2px;
+        overflow: hidden;
+        position: relative;
+      }
+      .asset-item .asset-thumb img {
+        max-width: 100%;
+        max-height: 100%;
+      }
+      .asset-item .label {
+        width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: #aaa;
+        margin-top: 2px;
+      }
+      .asset-item .ext-badge {
+        position: absolute;
+        bottom: 2px;
+        right: 2px;
+        background: rgba(0, 0, 0, 0.7);
+        color: #aaa;
+        font-size: 8px;
+        padding: 0 3px;
+        border-radius: 2px;
+        font-family: Consolas, monospace;
+        letter-spacing: 0.5px;
+      }
+      #animation-panel {
+        display: none;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
+      }
+      #animation-panel.active {
+        display: flex;
+      }
+      .anim-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 10px;
+        background: #1e1e1e;
+        border-bottom: 1px solid #333;
+        flex-shrink: 0;
+      }
+      .anim-header-btn {
+        background: #333;
+        border: 1px solid #444;
+        color: #ccc;
+        padding: 2px 8px;
+        cursor: pointer;
+        border-radius: 2px;
+        font-size: 11px;
+      }
+      .anim-header-btn:hover {
+        background: #444;
+      }
+      .anim-time {
+        font-family: Consolas, monospace;
+        color: #a8c8e8;
+        font-size: 11px;
+        width: 60px;
+        text-align: center;
+      }
+      .anim-header select {
+        background: #1e1e1e;
+        color: #ccc;
+        border: 1px solid #444;
+        padding: 1px 4px;
+        font-size: 11px;
+        border-radius: 2px;
+        flex: 1;
+        max-width: 200px;
+      }
+      .anim-main {
+        display: flex;
+        flex: 1;
+        min-height: 0;
+      }
+      .anim-clips-list {
+        width: 160px;
+        overflow-y: auto;
+        border-right: 1px solid #333;
+        background: #1a1a1a;
+        flex-shrink: 0;
+      }
+      .clip-item {
+        padding: 5px 8px;
+        font-size: 11px;
+        cursor: pointer;
+        color: #aaa;
+        border-bottom: 1px solid #2a2a2a;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .clip-item:hover {
+        background: #2a2d2e;
+        color: #fff;
+      }
+      .clip-item.active {
+        background: #094771;
+        color: #fff;
+      }
+      .anim-timeline-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        background: #1a1a1a;
+        position: relative;
+      }
+      .anim-ruler {
+        height: 20px;
+        position: relative;
+        border-bottom: 1px solid #333;
+        flex-shrink: 0;
+        background: #151515;
+        z-index: 5;
+      }
+      .ruler-tick {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        border-left: 1px solid #444;
+        padding-left: 3px;
+        font-size: 9px;
+        color: #888;
+        line-height: 20px;
+        font-family: Consolas, monospace;
+      }
+      .playhead {
+        position: absolute;
+        top: 20px;
+        bottom: 0;
+        left: 0;
+        width: 1px;
+        background: #ff4b4b;
+        z-index: 10;
+        pointer-events: none;
+      }
+      .playhead::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: -4px;
+        border-left: 4px solid transparent;
+        border-right: 4px solid transparent;
+        border-top: 6px solid #ff4b4b;
+      }
+      .anim-tracks {
+        flex: 1;
+        overflow-y: auto;
+        overflow-x: hidden;
+        position: relative;
+      }
+      .track-group-header {
+        display: flex;
+        height: 22px;
+        background: #222;
+        border-bottom: 1px solid #333;
+        align-items: center;
+        padding: 0 6px;
+        font-size: 10px;
+        color: #888;
+        text-transform: uppercase;
+      }
+      .track-row {
+        display: flex;
+        height: 22px;
+        border-bottom: 1px solid #2a2a2a;
+        align-items: center;
+        cursor: pointer;
+      }
+      .track-row:hover {
+        background: #222;
+      }
+      .track-label {
+        width: 140px;
+        padding: 0 6px;
+        font-family: Consolas, monospace;
+        font-size: 10px;
+        color: #9cdcfe;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        flex-shrink: 0;
+        border-right: 1px solid #333;
+      }
+      .track-bar {
+        flex: 1;
+        height: 100%;
+        position: relative;
+        padding-right: 8px;
+      }
+      .track-bar::before {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 0;
+        right: 8px;
+        height: 1px;
+        background: #2a2a2a;
+      }
+      .keyframe {
+        position: absolute;
+        top: 50%;
+        width: 8px;
+        height: 8px;
+        background: #4caf50;
+        border: 1px solid #2e7d32;
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+        cursor: pointer;
+        z-index: 2;
+      }
+      .keyframe:hover {
+        background: #6fdc6f;
+        z-index: 3;
+        box-shadow: 0 0 4px rgba(76, 175, 80, 0.8);
+      }
+      .keyframe.selected {
+        background: #ff9800;
+        border-color: #e65100;
+        box-shadow: 0 0 6px rgba(255, 152, 0, 0.8);
+        z-index: 4;
+      }
+      .anim-placeholder {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #555;
+        font-style: italic;
+        font-size: 12px;
+        text-align: center;
+        padding: 20px;
+        line-height: 1.6;
+      }
+      .anim-info {
+        height: 22px;
+        padding: 3px 8px;
+        background: #1a1a1a;
+        border-top: 1px solid #333;
+        font-size: 10px;
+        color: #888;
+        font-family: Consolas, monospace;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        line-height: 16px;
+        flex-shrink: 0;
+      }
+      .panel-title {
+        font-size: 10px;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        padding: 5px 10px;
+        background: #2d2d30;
+        color: #8a8a8a;
+        border-bottom: 1px solid #3c3c3c;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+      }
+      .tree {
+        padding: 4px 0;
+        font-family: Consolas, monospace;
+        font-size: 11px;
+      }
+      .tree-item {
+        padding: 2px 6px;
+        cursor: pointer;
+        border-radius: 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .tree-item:hover {
+        background: #2a2d2e;
+      }
+      .tree-item.sel {
+        background: #094771;
+      }
+      .tree-item .icon {
+        width: 14px;
+        text-align: center;
+        flex-shrink: 0;
+      }
+      .tree-item .name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex: 1;
+      }
+      .tree-item .open-scene-btn {
+        background: #3a5068;
+        border: none;
+        color: #a8c8e8;
+        padding: 0 4px;
+        border-radius: 2px;
+        cursor: pointer;
+        font-size: 10px;
+        height: 14px;
+        line-height: 1;
+      }
+      .tree-item .open-scene-btn:hover {
+        background: #4a6088;
+        color: #fff;
+      }
+      button {
+        background: #0e639c;
+        color: #fff;
+        border: none;
+        padding: 4px 10px;
+        cursor: pointer;
+        border-radius: 2px;
+        font-size: 11px;
+      }
+      button:hover {
+        background: #1177bb;
+      }
+      button.ghost {
+        background: #3a3d41;
+      }
+      button.ghost:hover {
+        background: #4a4d51;
+      }
+      button.tiny {
+        padding: 1px 6px;
+        font-size: 10px;
+      }
+      button.danger {
+        background: #8a2a2a;
+      }
+      button.danger:hover {
+        background: #aa3333;
+      }
+      input[type="number"],
+      input[type="text"],
+      select {
+        background: #1e1e1e;
+        color: #ccc;
+        border: 1px solid #3c3c3c;
+        padding: 2px 4px;
+        border-radius: 2px;
+        font-size: 11px;
+        min-width: 0;
+      }
+      input[type="number"] {
+        width: 56px;
+        flex-shrink: 0;
+      }
+      input[type="color"] {
+        width: 24px;
+        height: 18px;
+        border: 1px solid #3c3c3c;
+        border-radius: 2px;
+        background: #1e1e1e;
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+      input[type="range"] {
+        flex: 1;
+        min-width: 30px;
+        accent-color: #0e639c;
+      }
+      .insp-header {
+        padding: 6px 10px;
+        background: #2d2d30;
+        border-bottom: 1px solid #3c3c3c;
+        font-weight: 600;
+        color: #ddd;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        overflow: hidden;
+      }
+      .insp-group {
+        padding: 4px 8px;
+        background: #2a2a2c;
+        font-size: 9px;
+        text-transform: uppercase;
+        color: #888;
+        letter-spacing: 0.5px;
+        margin-top: 4px;
+        border-top: 1px solid #333;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .insp-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 8px;
+        font-size: 11px;
+        border-bottom: 1px solid #2a2a2a;
+        min-width: 0;
+      }
+      .insp-row:last-child {
+        border-bottom: none;
+      }
+      .insp-row > label {
+        width: 66px;
+        color: #888;
+        flex-shrink: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-size: 10.5px;
+      }
+      .insp-note {
+        padding: 4px 8px;
+        color: #666;
+        font-size: 10px;
+        line-height: 1.5;
+        border-bottom: 1px solid #2a2a2a;
+      }
+      .prop-block {
+        margin: 3px 8px;
+        border-radius: 4px;
+        border: 1px solid transparent;
+        transition:
+          border-color 0.15s,
+          background 0.15s;
+        overflow: hidden;
+      }
+      .prop-block.expanded {
+        border-color: #555;
+        background: #1a1a1c;
+      }
+      .prop-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 2px 3px;
+      }
+      .prop-row > label {
+        width: 56px;
+        color: #888;
+        font-size: 10.5px;
+        flex-shrink: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .prop-slot {
+        flex: 1;
+        min-width: 0;
+        height: 22px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 8px;
+        background: #2d2d30;
+        border: 1px solid #3c3c3c;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 11px;
+        user-select: none;
+        transition:
+          background 0.1s,
+          border-color 0.1s;
+      }
+      .prop-slot:hover {
+        border-color: #555;
+      }
+      .prop-slot.empty {
+        background: #222;
+        color: #666;
+        font-style: italic;
+      }
+      .prop-slot.empty:hover {
+        background: #2a2a2a;
+      }
+      .prop-block.expanded .prop-slot {
+        background: #333;
+        border-bottom-color: transparent;
+      }
+      .prop-slot .res-name {
+        color: #a8c8e8;
+        font-weight: 600;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        flex: 1;
+        min-width: 0;
+      }
+      .prop-slot .empty-name {
+        flex: 1;
+        color: #666;
+      }
+      .prop-slot .slot-arrow {
+        font-size: 8px;
+        color: #888;
+        flex-shrink: 0;
+      }
+      .prop-slot.drag-valid {
+        border-color: #4caf50 !important;
+        background-color: rgba(76, 175, 80, 0.15) !important;
+        box-shadow: inset 0 0 0 1px #4caf50;
+        cursor: copy !important;
+      }
+      .prop-slot.drag-invalid {
+        border-color: #f44336 !important;
+        background-color: rgba(244, 67, 54, 0.15) !important;
+        box-shadow: inset 0 0 0 1px #f44336;
+        cursor: not-allowed !important;
+      }
+      .slot-menu-btn {
+        width: 22px;
+        height: 22px;
+        background: #333;
+        border: 1px solid #444;
+        color: #aaa;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 14px;
+        padding: 0;
+        flex-shrink: 0;
+        line-height: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .slot-menu-btn:hover {
+        background: #444;
+        color: #fff;
+      }
+      .reset-btn {
+        width: 20px;
+        height: 20px;
+        background: #4a2a2a;
+        border: 1px solid #6a3a3a;
+        color: #e88;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 12px;
+        padding: 0;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-left: 4px;
+      }
+      .reset-btn:hover {
+        background: #6a3a3a;
+        color: #fff;
+      }
+      .prop-expanded-body {
+        border-top: 1px solid #333;
+        padding: 3px 0;
+        border-bottom-left-radius: 4px;
+        border-bottom-right-radius: 4px;
+      }
+      .prop-expanded-body .insp-row {
+        padding: 2px 8px;
+        border-bottom: none;
+      }
+      .prop-expanded-body .insp-row > label {
+        width: 52px;
+        font-size: 10px;
+      }
+      .prop-expanded-body .insp-group {
+        margin-top: 2px;
+        border-top: 1px solid #2a2a2a;
+        padding: 3px 8px;
+        background: transparent;
+      }
+      .prop-expanded-body .prop-block {
+        margin: 2px 4px;
+      }
+      .prop-section {
+        margin: 2px 4px;
+        border-radius: 3px;
+        background: #222;
+        overflow: hidden;
+      }
+      .prop-section-header {
+        padding: 3px 6px;
+        font-size: 10px;
+        text-transform: uppercase;
+        color: #aaa;
+        cursor: pointer;
+        user-select: none;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        border-bottom: 1px solid transparent;
+      }
+      .prop-section.expanded .prop-section-header {
+        border-bottom-color: #333;
+      }
+      .prop-section-header:hover {
+        background: #2a2a2a;
+      }
+      .prop-section-header .arrow {
+        font-size: 8px;
+        color: #666;
+        transition: transform 0.15s;
+        display: inline-block;
+      }
+      .prop-section.expanded .prop-section-header .arrow {
+        transform: rotate(90deg);
+      }
+      .prop-section-body {
+        padding: 2px 0;
+        display: none;
+      }
+      .prop-section.expanded .prop-section-body {
+        display: block;
+      }
+      .tex-preview {
+        max-width: 100%;
+        max-height: 110px;
+        object-fit: contain;
+        border: 1px solid #444;
+        border-radius: 2px;
+        display: block;
+        margin: 3px auto;
+        image-rendering: pixelated;
+      }
+      .res-dropdown {
+        background: #2d2d30;
+        border: 1px solid #555;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        border-radius: 3px;
+        min-width: 180px;
+        max-height: 400px;
+        overflow-y: auto;
+        font-size: 11px;
+        position: fixed;
+        z-index: 1000;
+      }
+      .dropdown-header {
+        padding: 4px 8px;
+        background: #252526;
+        color: #888;
+        font-size: 9px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .dropdown-item {
+        padding: 4px 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .dropdown-item:hover {
+        background: #094771;
+      }
+      .dropdown-empty {
+        padding: 6px 10px;
+        color: #666;
+        font-style: italic;
+        font-size: 10px;
+        text-align: center;
+        line-height: 1.4;
+      }
+      .json-view {
+        margin: 4px 8px;
+        background: #0f0f0f;
+        border: 1px solid #333;
+        border-radius: 3px;
+        padding: 6px;
+        font-family: Consolas, monospace;
+        font-size: 10px;
+        color: #ccc;
+        max-height: 400px;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-all;
+        line-height: 1.35;
+      }
+      .json-key {
+        color: #9cdcfe;
+      }
+      .json-string {
+        color: #ce9178;
+      }
+      .json-number {
+        color: #b5cea8;
+      }
+      .json-bool {
+        color: #569cd6;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div id="toolbar">
+        <strong>◆ 3D EDITOR v46</strong>
+        <button id="btn-save-scene" class="ghost">💾 Сохранить сцену</button>
+        <span id="status">Готов</span>
+      </div>
+      <div id="scene-tree-panel">
+        <div class="panel-title">
+          Scene Tree <button id="btn-add-node" title="Добавить узел">+</button>
+        </div>
+        <div id="scene-tree" class="tree">
+          <div class="placeholder">Пустая сцена</div>
+        </div>
+      </div>
+      <div id="viewport"></div>
+      <div id="inspector">
+        <div class="panel-title">Inspector</div>
+        <div id="inspector-body">
+          <div class="placeholder">Выберите узел</div>
+        </div>
+      </div>
+      <div id="bottom-panel">
+        <div class="bottom-tabs">
+          <div class="bottom-tab active" data-tab="assets">ASSETS</div>
+          <div class="bottom-tab" data-tab="animation">ANIMATION</div>
+          <button id="btn-add-asset" title="Создать ресурс">+</button>
+        </div>
+        <div id="assets-panel" class="panel-view active">
+          <div id="drop-zone">
+            Перетащите .glb / .gltf / .png сюда (или ПКМ для меню)
+          </div>
+          <div class="asset-toolbar">
+            <span id="asset-count" style="color: #555">(0)</span>
+            <span style="color: #888; margin-left: 8px">Фильтр:</span>
+            <button class="filter-btn active" data-filter="all">Все</button>
+            <button class="filter-btn" data-filter="prefab">Префабы</button>
+            <button class="filter-btn" data-filter="scene">Сцены</button>
+            <button class="filter-btn" data-filter="texture">Текстуры</button>
+            <button class="filter-btn" data-filter="material">Материалы</button>
+            <button class="filter-btn" data-filter="mesh">Меши</button>
+            <button class="filter-btn" data-filter="animation">Анимации</button>
+          </div>
+          <div class="asset-grid" id="asset-grid"></div>
+        </div>
+        <div id="animation-panel" class="panel-view">
+          <div class="anim-header">
+            <button class="anim-header-btn" id="anim-play-btn">▶</button>
+            <input
+              type="range"
+              id="anim-time-slider"
+              min="0"
+              max="1"
+              step="0.001"
+              value="0"
+              style="flex: 1"
+            />
+            <div class="anim-time" id="anim-time-display">0.00s</div>
+            <div
+              style="width: 1px; height: 16px; background: #444; margin: 0 4px"
+            ></div>
+            <select id="anim-clip-select"></select>
+          </div>
+          <div class="anim-main">
+            <div class="anim-clips-list" id="anim-clips-list"></div>
+            <div class="anim-timeline-container">
+              <div class="anim-ruler" id="anim-ruler"></div>
+              <div class="anim-tracks" id="anim-tracks"></div>
+              <div class="playhead" id="anim-playhead"></div>
+            </div>
+          </div>
+          <div class="anim-info" id="anim-info">
+            Выберите узел AnimationMixer или ресурс Animation
+          </div>
+        </div>
+      </div>
+    </div>
+    <input
+      type="file"
+      id="file-input"
+      accept=".glb,.gltf,.png,.jpg,.jpeg,.webp,.bin"
+      multiple
+      hidden
+    />
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+
+    <script type="module">
+      import * as THREE from "three";
+      import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+      import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+      import { clone as cloneSkeleton } from "three/addons/utils/SkeletonUtils.js";
+
+      class ThreeRenderer {
+        constructor(c) {
+          this.renderer = new THREE.WebGLRenderer({ antialias: true });
+          this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+          this.renderer.shadowMap.enabled = true;
+          this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+          c.appendChild(this.renderer.domElement);
+        }
+        setSize(w, h) {
+          this.renderer.setSize(w, h, false);
+        }
+        render(s, c) {
+          this.renderer.render(s, c);
+        }
+      }
+      const viewport = document.getElementById("viewport");
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x181818);
+      scene.add(new THREE.GridHelper(10, 20, 0x333333, 0x222222));
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x333333, 1.2));
+      const sun = new THREE.DirectionalLight(0xffffff, 1.8);
+      sun.position.set(5, 10, 7);
+      scene.add(sun);
+      const world = new THREE.Group();
+      world.name = "World";
+      scene.add(world);
+
+      const camera = new THREE.PerspectiveCamera(50, 1, 0.01, 1000);
+      camera.position.set(3, 3, 5);
+      const renderer = new ThreeRenderer(viewport);
+      const controls = new OrbitControls(camera, renderer.renderer.domElement);
+      controls.enableDamping = true;
+
+      function resize() {
+        const w = viewport.clientWidth,
+          h = viewport.clientHeight;
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h);
+      }
+      addEventListener("resize", resize);
+      resize();
+
+      let RES_ID = 0,
+        NODE_ID = 0;
+      const library = new Map();
+      const expandedResources = new Set();
+      const collapsedSections = new Set();
+      const activeMixers = [];
+      let currentDragType = null;
+
+      class Resource {
+        constructor(type, name, data, opts = {}) {
+          this.id = "res_" + ++RES_ID;
+          this.type = type;
+          this.name = name;
+          this.data = data;
+          this.refs = opts.refs || {};
+          this.clips = opts.clips || [];
+          this.owner = opts.owner || null;
+          this.internalNodes = opts.internalNodes || null;
+          this.internalResources = opts.internalResources || null;
+          this.imported = opts.imported || false;
+        }
+      }
+      function addRes(r) {
+        library.set(r.id, r);
+        return r;
+      }
+      function getRes(id) {
+        return library.get(id);
+      }
+      function allRes() {
+        return [...library.values()];
+      }
+
+      const NODE_ICON = {
+        Node3D: "⬚",
+        Model3D: "🧊",
+        MeshInstance3D: "◯",
+        SkinnedMeshInstance3D: "⬡",
+        Skeleton3D: "💀",
+        Sprite3D: "🖼",
+        Light3D: "💡",
+        Camera3D: "📷",
+        AnimationMixer: "🎬",
+        SceneInstance: "🗺️",
+      };
+      const RES_ICON = {
+        prefab: "📦",
+        scene: "🗺️",
+        mesh: "△",
+        material: "🎨",
+        texture: "🖼",
+        animation: "🎬",
+        animation_clip: "🎞️",
+      };
+
+      function classifyObject(o) {
+        if (o.isSkinnedMesh) return "SkinnedMeshInstance3D";
+        if (o.isMesh) return "MeshInstance3D";
+        if (o.isSprite) return "Sprite3D";
+        if (o.isLight) return "Light3D";
+        if (o.isCamera) return "Camera3D";
+        if (o.userData.isModelRoot) return "Model3D";
+        if (o.children.length > 0 && o.children.every((c) => c.isBone))
+          return "Skeleton3D";
+        return "Node3D";
+      }
+
+      function makeSceneNode(obj, parent, old = null) {
+        if (obj.isBone) return null;
+        let type = classifyObject(obj);
+        const isSceneInstance = !!obj.userData.isSceneInstance;
+        if (isSceneInstance && (!old || old.type !== "SceneInstance"))
+          type = "SceneInstance";
+        const node = {
+          id: old?.id || "n" + ++NODE_ID,
+          type,
+          name: obj.name || obj.type || "Node",
+          object3d: obj,
+          parent,
+          children: [],
+          refs: old?.refs ? { ...old.refs } : {},
+          overrides: old?.overrides
+            ? JSON.parse(JSON.stringify(old.overrides))
+            : {},
+          hideChildren: isSceneInstance,
+          bones: old?.bones || null,
+          mixer: old?.mixer || null,
+          currentAction: old?.currentAction || null,
+          currentAnimIndex: old?.currentAnimIndex ?? 0,
+          isPlaying: old?.isPlaying ?? true,
+          timeScale: old?.timeScale ?? 1.0,
+          loop: old?.loop ?? true,
+        };
+        obj.userData.sceneNode = node;
+        if (type === "Skeleton3D") {
+          node.bones = [];
+          obj.traverse((o) => {
+            if (o.isBone) node.bones.push(o);
+          });
+          return node;
+        }
+        for (const c of obj.children) {
+          if (c.isBone) continue;
+          const oc = old?.children.find((x) => x.object3d === c) || null;
+          const cn = makeSceneNode(c, node, oc);
+          if (cn) node.children.push(cn);
+        }
+        if (old) {
+          for (const oc of old.children) {
+            if (!oc.object3d) {
+              oc.parent = node;
+              node.children.push(oc);
+            }
+          }
+        }
+        return node;
+      }
+
+      const state = {
+        sceneRoot: null,
+        selectedNode: null,
+        selectedResource: null,
+        selectedBone: null,
+        model: null,
+        assetFilter: "all",
+        currentAnimResource: null,
+        currentAnimClipId: null,
+        animIsPlaying: false,
+        animCurrentTime: 0,
+        selectedKeyframe: null,
+        currentSceneResources: new Set(),
+        currentSceneResId: null,
+      };
+      state.sceneRoot = makeSceneNode(world, null);
+
+      /* ============ RESOLVE MESH REFS (через userData._meshResId) ============ */
+      function resolveMeshRefs(clone, internalResources) {
+        const byId = new Map();
+        for (const r of internalResources)
+          if (r.type === "mesh") byId.set(r.id, r);
+        const pairs = [];
+        clone.traverse((o) => {
+          if (!o.isMesh && !o.isSkinnedMesh) return;
+          let mr = null;
+          if (o.userData._meshResId) mr = byId.get(o.userData._meshResId);
+          if (!mr && o.geometry?.userData?.resource?.id)
+            mr = byId.get(o.geometry.userData.resource.id);
+          if (mr) pairs.push({ obj: o, meshRes: mr });
+        });
+        return pairs;
+      }
+
+      /* ============ ATTACH MIXER для открытой сцены ============ */
+      function attachMixerToScene() {
+        // Ищем animation resource среди currentSceneResources
+        let animRes = null;
+        for (const rId of state.currentSceneResources) {
+          const r = getRes(rId);
+          if (r && r.type === "animation") {
+            animRes = r;
+            break;
+          }
+        }
+        if (!animRes) return;
+
+        // Ищем AnimationMixer узел уже
+        let found = null;
+        (function walk(n) {
+          if (!n || found) return;
+          if (n.type === "AnimationMixer") {
+            found = n;
+            return;
+          }
+          for (const c of n.children) walk(c);
+        })(state.sceneRoot);
+        if (found) return;
+
+        // Найти цель: Skeleton3D (приоритет) или первый узел
+        let targetNode = null;
+        (function find(node) {
+          if (!node || targetNode) return;
+          if (node.type === "Skeleton3D") {
+            targetNode = node;
+            return;
+          }
+          for (const c of node.children) find(c);
+        })(state.sceneRoot);
+        if (!targetNode) targetNode = state.sceneRoot.children[0];
+        if (!targetNode) return;
+
+        const mixerNode = {
+          id: "n" + ++NODE_ID,
+          type: "AnimationMixer",
+          name: "AnimationMixer",
+          object3d: null,
+          parent: targetNode,
+          children: [],
+          refs: { animation: animRes.id },
+          currentAnimIndex: 0,
+          isPlaying: true,
+          timeScale: 1.0,
+          loop: true,
+          mixer: null,
+        };
+        targetNode.children.push(mixerNode);
+      }
+
+      /* ============ SYNC 3D SCENE ============ */
+      function sync3DScene() {
+        function walk(node) {
+          if (!node) return;
+          if (node.type === "AnimationMixer") {
+            rebuildMixerActions(node);
+            return;
+          }
+          const obj = node.object3d;
+          if (node.type === "Sprite3D" && obj) {
+            const texId =
+              node.refs.texture || node.overrides?.[obj.uuid]?.texture;
+            if (texId) {
+              const t = getRes(texId);
+              if (t && obj.material) obj.material.map = t.data;
+            }
+          }
+          if (
+            obj &&
+            (node.type === "MeshInstance3D" ||
+              node.type === "SkinnedMeshInstance3D")
+          ) {
+            const meshRes = node.refs.mesh ? getRes(node.refs.mesh) : null;
+            if (meshRes) {
+              obj.geometry = meshRes.data;
+              const matRes = meshRes.refs.material
+                ? getRes(meshRes.refs.material)
+                : null;
+              if (matRes) {
+                let material = matRes.data;
+                const ov = node.overrides && node.overrides[matRes.id];
+                if (ov && Object.keys(ov).length > 0) {
+                  const savedRes = material.userData?.resource;
+                  if (material.userData) delete material.userData.resource;
+                  try {
+                    material = matRes.data.clone();
+                  } catch (e) {
+                    material = matRes.data;
+                  }
+                  if (savedRes && matRes.data.userData)
+                    matRes.data.userData.resource = savedRes;
+                  if (material.userData) material.userData.resource = matRes;
+                  material.needsUpdate = true;
+                  if (ov.color !== undefined) material.color.set(ov.color);
+                  if (ov.metalness !== undefined)
+                    material.metalness = ov.metalness;
+                  if (ov.roughness !== undefined)
+                    material.roughness = ov.roughness;
+                  if (ov.albedo !== undefined) {
+                    const t = ov.albedo ? getRes(ov.albedo) : null;
+                    material.map = t ? t.data : null;
+                  } else if (matRes.refs.albedo) {
+                    const t = getRes(matRes.refs.albedo);
+                    if (t) material.map = t.data;
+                  } else material.map = null;
+                  if (ov.normal !== undefined) {
+                    const t = ov.normal ? getRes(ov.normal) : null;
+                    material.normalMap = t ? t.data : null;
+                  } else if (matRes.refs.normal) {
+                    const t = getRes(matRes.refs.normal);
+                    if (t) material.normalMap = t.data;
+                  } else material.normalMap = null;
+                } else {
+                  material.needsUpdate = true;
+                  if (matRes.refs.albedo) {
+                    const t = getRes(matRes.refs.albedo);
+                    if (t) material.map = t.data;
+                  } else {
+                    material.map = null;
+                  }
+                  if (matRes.refs.normal) {
+                    const t = getRes(matRes.refs.normal);
+                    if (t) material.normalMap = t.data;
+                  } else {
+                    material.normalMap = null;
+                  }
+                }
+                obj.material = material;
+              }
+            }
+          }
+          for (const c of node.children) walk(c);
+        }
+        walk(state.sceneRoot);
+      }
+
+      function rebuildMixerActions(node) {
+        if (node.type !== "AnimationMixer") return;
+        const animId = node.refs.animation;
+        if (!animId) return;
+        const animRes = getRes(animId);
+        if (!animRes || !animRes.clips) return;
+        const clips = animRes.clips
+          .map((id) => getRes(id)?.data)
+          .filter(Boolean);
+        if (clips.length === 0) return;
+        if (!node.mixer) {
+          const parentObj = node.parent.object3d;
+          if (!parentObj) return;
+          node.mixer = new THREE.AnimationMixer(parentObj);
+          activeMixers.push(node.mixer);
+        }
+        node.mixer.stopAllAction();
+        const idx = Math.max(
+          0,
+          Math.min(node.currentAnimIndex, clips.length - 1),
+        );
+        node.currentAnimIndex = idx;
+        const action = node.mixer.clipAction(clips[idx]);
+        action.play();
+        action.paused = !node.isPlaying;
+        action.timeScale = node.timeScale;
+        action.setLoop(node.loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
+        node.currentAction = action;
+      }
+
+      /* ============ GC: используются ли ресурсы ============ */
+      function collectUsedResources(rootNode) {
+        const used = new Set();
+        function visitResource(resId) {
+          if (!resId || used.has(resId)) return;
+          used.add(resId);
+          const r = getRes(resId);
+          if (!r) return;
+          if (r.refs)
+            for (const rid of Object.values(r.refs))
+              if (rid) visitResource(rid);
+          if (r.clips) for (const cid of r.clips) if (cid) visitResource(cid);
+        }
+        function walk(node) {
+          if (!node) return;
+          if (node.refs)
+            for (const refId of Object.values(node.refs))
+              if (refId) visitResource(refId);
+          if (node.overrides) {
+            for (const ov of Object.values(node.overrides)) {
+              for (const v of Object.values(ov))
+                if (typeof v === "string" && v.startsWith("res_"))
+                  visitResource(v);
+            }
+          }
+          for (const c of node.children) walk(c);
+        }
+        walk(rootNode);
+        return used;
+      }
+
+      /* ============ NODE CREATORS ============ */
+      function createNodeMeshInstance() {
+        const geo = new THREE.BoxGeometry(1, 1, 1);
+        const mat = new THREE.MeshStandardMaterial({
+          color: 0xcccccc,
+          roughness: 0.5,
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.name = "MeshInstance3D";
+        mesh.position.y = 0.5;
+        mesh.castShadow = mesh.receiveShadow = true;
+        world.add(mesh);
+        rebuildTree();
+        const node =
+          state.sceneRoot.children[state.sceneRoot.children.length - 1];
+        if (!node) return;
+        const meshRes = addRes(
+          new Resource("mesh", "BoxMesh_" + (RES_ID + 1), geo),
+        );
+        const matRes = addRes(
+          new Resource("material", "Material_" + (RES_ID + 1), mat),
+        );
+        meshRes.refs.material = matRes.id;
+        geo.userData.resource = meshRes;
+        mat.userData.resource = matRes;
+        mesh.userData._meshResId = meshRes.id;
+        node.refs.mesh = meshRes.id;
+        state.currentSceneResources.add(meshRes.id);
+        state.currentSceneResources.add(matRes.id);
+        selectNode(node);
+        sync3DScene();
+        setStatus("✅ Добавлен MeshInstance3D");
+      }
+      function createNodeSprite3D() {
+        const geo = new THREE.PlaneGeometry(1, 1);
+        const mat = new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+          side: THREE.DoubleSide,
+          transparent: true,
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.name = "Sprite3D";
+        mesh.position.set(0, 1, 0);
+        mesh.userData.billboard = true;
+        world.add(mesh);
+        rebuildTree();
+        const node =
+          state.sceneRoot.children[state.sceneRoot.children.length - 1];
+        if (node) selectNode(node);
+        setStatus("✅ Добавлен Sprite3D");
+      }
+      function createNodeEmpty() {
+        const group = new THREE.Group();
+        group.name = "Node3D";
+        world.add(group);
+        rebuildTree();
+        const node =
+          state.sceneRoot.children[state.sceneRoot.children.length - 1];
+        if (node) selectNode(node);
+      }
+
+      /* ============ INSTANTIATION ============ */
+      function instantiateAssetInWorld(res) {
+        if (res.type === "mesh") {
+          const mat = new THREE.MeshStandardMaterial({
+            color: 0xcccccc,
+            roughness: 0.5,
+          });
+          const mesh = new THREE.Mesh(res.data, mat);
+          mesh.name = "MeshInstance3D";
+          mesh.position.y = 0.5;
+          mesh.castShadow = mesh.receiveShadow = true;
+          world.add(mesh);
+          const node = makeSceneNode(mesh, state.sceneRoot);
+          state.sceneRoot.children.push(node);
+          node.refs.mesh = res.id;
+          if (!res.refs.material) {
+            const newRes = addRes(
+              new Resource("material", "Material_" + (RES_ID + 1), mat),
+            );
+            res.refs.material = newRes.id;
+            state.currentSceneResources.add(newRes.id);
+          }
+          rebuildTree();
+          sync3DScene();
+          selectNode(node);
+          setStatus(`Добавлен MeshInstance3D из ${res.name}`);
+        } else if (res.type === "texture") {
+          const geo = new THREE.PlaneGeometry(1, 1);
+          const mat = new THREE.MeshStandardMaterial({
+            map: res.data,
+            transparent: true,
+            side: THREE.DoubleSide,
+            alphaTest: 0.5,
+          });
+          const mesh = new THREE.Mesh(geo, mat);
+          mesh.name = "Sprite3D";
+          mesh.position.set(0, 1, 0);
+          mesh.userData.billboard = true;
+          world.add(mesh);
+          const node = makeSceneNode(mesh, state.sceneRoot);
+          if (node) {
+            state.sceneRoot.children.push(node);
+            node.refs.texture = res.id;
+          }
+          rebuildTree();
+          sync3DScene();
+          if (node) selectNode(node);
+          setStatus(`Добавлен Sprite3D из ${res.name}`);
+        } else if (res.type === "prefab") {
+          const clone = cloneSkeleton(res.data);
+          clone.name = res.name;
+          clone.userData.isModelRoot = true;
+          clone.traverse((o) => {
+            delete o.userData.sceneNode;
+          });
+          world.add(clone);
+          const node = makeSceneNode(clone, state.sceneRoot);
+          if (node) {
+            state.sceneRoot.children.push(node);
+            node.refs.prefab = res.id;
+            const pairs = resolveMeshRefs(clone, res.internalResources || []);
+            for (const { obj, meshRes } of pairs) {
+              const n = obj.userData.sceneNode;
+              if (n) n.refs.mesh = meshRes.id;
+            }
+            const animRes = res.internalResources.find(
+              (r) => r.type === "animation",
+            );
+            if (animRes) {
+              const mixerNode = {
+                id: "n" + ++NODE_ID,
+                type: "AnimationMixer",
+                name: "AnimationMixer",
+                object3d: null,
+                parent: node,
+                children: [],
+                refs: { animation: animRes.id },
+                currentAnimIndex: 0,
+                isPlaying: true,
+                timeScale: 1.0,
+                loop: true,
+                mixer: null,
+              };
+              node.children.push(mixerNode);
+            }
+          }
+          rebuildTree();
+          sync3DScene();
+          if (node) selectNode(node);
+          setStatus(`Инстанс префаба ${res.name} добавлен`);
+        } else if (res.type === "scene") {
+          const containerClone = cloneSkeleton(res.data);
+          containerClone.name = res.name;
+          containerClone.userData.isSceneInstance = true;
+          containerClone.userData.sceneResId = res.id;
+          containerClone.traverse((o) => {
+            delete o.userData.sceneNode;
+          });
+          world.add(containerClone);
+          const node = makeSceneNode(containerClone, state.sceneRoot);
+          if (node) {
+            state.sceneRoot.children.push(node);
+            node.refs.scene = res.id;
+            const pairs = resolveMeshRefs(
+              containerClone,
+              res.internalResources || [],
+            );
+            for (const { obj, meshRes } of pairs) {
+              const n = obj.userData.sceneNode;
+              if (n) n.refs.mesh = meshRes.id;
+            }
+          }
+          rebuildTree();
+          sync3DScene();
+          if (node) selectNode(node);
+          setStatus(`Сцена "${res.name}" вставлена как instance`);
+        }
+      }
+
+      /* ============ OPEN SCENE (С ATTACH MIXER + MESH REFS) ============ */
+      function openScene(sceneId) {
+        const res = getRes(sceneId);
+        if (!res) return;
+
+        while (world.children.length > 0) world.remove(world.children[0]);
+
+        if (res.type === "prefab") {
+          const clone = cloneSkeleton(res.data);
+          clone.traverse((o) => {
+            delete o.userData.sceneNode;
+          });
+          clone.userData.isModelRoot = true;
+          world.add(clone);
+        } else {
+          const containerClone = cloneSkeleton(res.data);
+          containerClone.traverse((o) => {
+            delete o.userData.sceneNode;
+          });
+          while (containerClone.children.length > 0) {
+            world.add(containerClone.children[0]);
+          }
+        }
+
+        state.currentSceneResources.clear();
+        if (res.internalResources)
+          for (const r of res.internalResources)
+            state.currentSceneResources.add(r.id);
+        state.currentSceneResId = res.id;
+
+        state.sceneRoot = makeSceneNode(world, null);
+
+        // Восстановить mesh refs
+        const pairs = resolveMeshRefs(world, res.internalResources || []);
+        for (const { obj, meshRes } of pairs) {
+          const n = obj.userData.sceneNode;
+          if (n) n.refs.mesh = meshRes.id;
+        }
+
+        // Прикрепить AnimationMixer
+        attachMixerToScene();
+
+        rebuildTree();
+        sync3DScene();
+        setStatus(
+          `📂 Открыта сцена "${res.name}" (${state.currentSceneResources.size} рес.)`,
+        );
+      }
+
+      /* ============ SAVE SCENE (с удалением orphan'ов из library) ============ */
+      function saveSceneAsResource(name) {
+        // GC
+        const used = collectUsedResources(state.sceneRoot);
+        const orphans = [];
+        for (const resId of [...state.currentSceneResources]) {
+          if (!used.has(resId)) orphans.push(resId);
+        }
+
+        // Удаляем orphans из library ПОЛНОСТЬЮ и из всех prefab/scene
+        for (const resId of orphans) {
+          const orphanRes = getRes(resId);
+          if (!orphanRes) continue;
+          // Найти все prefab/scene, где он в internalResources
+          for (const p of allRes()) {
+            if (
+              (p.type === "prefab" || p.type === "scene") &&
+              p.internalResources
+            ) {
+              p.internalResources = p.internalResources.filter(
+                (r) => r.id !== resId,
+              );
+            }
+          }
+          // Удалить из library и currentSceneResources
+          library.delete(resId);
+          state.currentSceneResources.delete(resId);
+          // Убрать из других ресурсов.refs (например, material.refs.albedo = orphan)
+          for (const r of allRes()) {
+            if (r.refs)
+              for (const [slot, ref] of Object.entries(r.refs))
+                if (ref === resId) delete r.refs[slot];
+          }
+        }
+
+        const resources = [];
+        for (const resId of state.currentSceneResources) {
+          const r = getRes(resId);
+          if (r) resources.push(r);
+        }
+
+        // Strip userData
+        const savedUD = [];
+        function stripUD(obj) {
+          if (!obj || !obj.userData) return;
+          if (Object.keys(obj.userData).length > 0) {
+            const bak = { ...obj.userData };
+            savedUD.push({ obj, data: bak });
+            obj.userData = {};
+          }
+        }
+        world.traverse((o) => {
+          stripUD(o);
+          if (o.geometry) stripUD(o.geometry);
+          if (o.material) {
+            const ms = Array.isArray(o.material) ? o.material : [o.material];
+            for (const m of ms) stripUD(m);
+          }
+        });
+
+        const sceneContainer = new THREE.Group();
+        sceneContainer.name = name;
+        sceneContainer.userData.isModelRoot = true;
+
+        let errMsg = "";
+        try {
+          for (const child of world.children)
+            sceneContainer.add(cloneSkeleton(child));
+        } catch (e) {
+          errMsg = "SkeletonUtils: " + e.message;
+        }
+
+        for (const { obj, data } of savedUD) obj.userData = data;
+        if (errMsg) {
+          setStatus("❌ " + errMsg);
+          return;
+        }
+
+        const existing = state.currentSceneResId
+          ? getRes(state.currentSceneResId)
+          : null;
+
+        if (
+          existing &&
+          (existing.type === "scene" || existing.type === "prefab")
+        ) {
+          existing.data = sceneContainer;
+          existing.name = name;
+          existing.internalResources = resources;
+          existing.internalNodes = [];
+          for (const child of sceneContainer.children) {
+            (function walk(obj) {
+              if (obj.isBone) return;
+              const type = classifyObject(obj);
+              existing.internalNodes.push({
+                id: "n" + ++NODE_ID,
+                type,
+                name: obj.name || type,
+                object3d: obj,
+                parent: null,
+                children: [],
+                refs: {},
+              });
+              for (const c of obj.children) walk(c);
+            })(child);
+          }
+          state.assetFilter = "all";
+          document
+            .querySelectorAll(".filter-btn")
+            .forEach((b) =>
+              b.classList.toggle("active", b.dataset.filter === "all"),
+            );
+          renderAssets();
+          selectResource(existing);
+          setStatus(
+            `✅ Сцена "${name}" обновлена (${resources.length} рес., удалено ${orphans.length})`,
+          );
+          return;
+        }
+
+        const sceneRes = addRes(
+          new Resource("scene", name, sceneContainer, { imported: true }),
+        );
+        sceneRes.internalResources = resources;
+        sceneRes.internalNodes = [];
+        for (const child of sceneContainer.children) {
+          (function walk(obj) {
+            if (obj.isBone) return;
+            const type = classifyObject(obj);
+            sceneRes.internalNodes.push({
+              id: "n" + ++NODE_ID,
+              type,
+              name: obj.name || type,
+              object3d: obj,
+              parent: null,
+              children: [],
+              refs: {},
+            });
+            for (const c of obj.children) walk(c);
+          })(child);
+        }
+
+        state.currentSceneResId = sceneRes.id;
+        state.assetFilter = "all";
+        document
+          .querySelectorAll(".filter-btn")
+          .forEach((b) =>
+            b.classList.toggle("active", b.dataset.filter === "all"),
+          );
+        renderAssets();
+        selectResource(sceneRes);
+        setStatus(
+          `✅ Сцена "${name}" создана (${resources.length} рес., удалено ${orphans.length})`,
+        );
+      }
+
+      document.getElementById("btn-save-scene").onclick = () => {
+        let name = state.currentSceneResId
+          ? getRes(state.currentSceneResId)?.name || "Scene"
+          : "Scene_" + Date.now();
+        try {
+          const p = window.prompt("Имя сцены:", name);
+          if (p !== null && p !== undefined && p !== "") name = p;
+        } catch (e) {}
+        saveSceneAsResource(name);
+      };
+
+      /* ============ TREE ============ */
+      function rebuildTree() {
+        state.sceneRoot = makeSceneNode(world, null, state.sceneRoot);
+        renderSceneTree();
+      }
+      function renderSceneTree() {
+        const c = document.getElementById("scene-tree");
+        c.innerHTML = "";
+        if (!state.sceneRoot.children.length) {
+          c.innerHTML =
+            '<div class="placeholder">Пустая сцена<br><small>Нажмите + вверху</small></div>';
+          return;
+        }
+        for (const ch of state.sceneRoot.children)
+          c.appendChild(renderNodeEl(ch, 0));
+      }
+      function renderNodeEl(node, depth) {
+        const wrap = document.createElement("div");
+        const el = document.createElement("div");
+        el.className =
+          "tree-item" +
+          (state.selectedNode === node && !state.selectedResource
+            ? " sel"
+            : "");
+        el.style.paddingLeft = 6 + depth * 12 + "px";
+        let icon;
+        if (node.type === "SceneInstance") icon = "🗺️";
+        else if (node.refs && node.refs.prefab) icon = "📦";
+        else icon = NODE_ICON[node.type] || "·";
+        const boneCount =
+          node.type === "Skeleton3D" ? ` (${node.bones.length} bones)` : "";
+        const hasOv = Object.keys(node.overrides || {}).length > 0;
+        el.innerHTML = `<span class="icon">${icon}</span><span class="name">${node.name}${boneCount}</span>${hasOv ? '<span style="color:#ff9800;">*</span>' : ""}`;
+        if (node.type === "SceneInstance" && node.refs.scene) {
+          const btn = document.createElement("button");
+          btn.className = "open-scene-btn";
+          btn.textContent = "📂";
+          btn.title = "Открыть оригинальную сцену";
+          btn.onclick = (e) => {
+            e.stopPropagation();
+            openScene(node.refs.scene);
+          };
+          el.appendChild(btn);
+        }
+        el.title = node.type;
+        el.onclick = (e) => {
+          e.stopPropagation();
+          selectNode(node);
+        };
+        wrap.appendChild(el);
+        if (!node.hideChildren) {
+          for (const ch of node.children)
+            wrap.appendChild(renderNodeEl(ch, depth + 1));
+        }
+        return wrap;
+      }
+      function selectNode(n) {
+        state.selectedNode = n;
+        state.selectedResource = null;
+        if (n.type !== "Skeleton3D") state.selectedBone = null;
+        if (n.type === "AnimationMixer") {
+          const animId = n.refs.animation;
+          if (animId) {
+            const animRes = getRes(animId);
+            if (animRes) {
+              state.currentAnimResource = animRes;
+              state.currentAnimClipId =
+                animRes.clips[n.currentAnimIndex] || animRes.clips[0];
+            }
+          } else {
+            state.currentAnimResource = null;
+            state.currentAnimClipId = null;
+          }
+          switchTab("animation");
+          renderAnimationEditor();
+        } else {
+          if (
+            document
+              .querySelector('.bottom-tab[data-tab="animation"]')
+              .classList.contains("active")
+          ) {
+            state.currentAnimResource = null;
+            state.currentAnimClipId = null;
+            renderAnimationEditor();
+          }
+        }
+        renderSceneTree();
+        renderAssets();
+        renderInspector();
+      }
+      function selectResource(r) {
+        state.selectedResource = r;
+        state.selectedNode = null;
+        if (r.type === "animation") {
+          state.currentAnimResource = r;
+          state.currentAnimClipId = r.clips[0] || null;
+          switchTab("animation");
+          renderAnimationEditor();
+        } else if (r.type === "animation_clip") {
+          const parentAnim = allRes().find(
+            (x) => x.type === "animation" && x.clips && x.clips.includes(r.id),
+          );
+          if (parentAnim) state.currentAnimResource = parentAnim;
+          else
+            state.currentAnimResource = { clips: [r.id], name: "(standalone)" };
+          state.currentAnimClipId = r.id;
+          switchTab("animation");
+          renderAnimationEditor();
+        }
+        renderSceneTree();
+        renderAssets();
+        renderInspector();
+      }
+      function findNode(id) {
+        let found = null;
+        (function walk(n) {
+          if (!n || found) return;
+          if (n.id === id) found = n;
+          for (const c of n.children) walk(c);
+        })(state.sceneRoot);
+        return found;
+      }
+      function findActiveMixerNode() {
+        if (state.selectedNode?.type === "AnimationMixer")
+          return state.selectedNode;
+        let found = null;
+        (function walk(n) {
+          if (!n || found) return;
+          if (n.type === "AnimationMixer") found = n;
+          for (const c of n.children) walk(c);
+        })(state.sceneRoot);
+        return found;
+      }
+
+      /* ============ TABS ============ */
+      function switchTab(name) {
+        document
+          .querySelectorAll(".bottom-tab")
+          .forEach((t) => t.classList.toggle("active", t.dataset.tab === name));
+        document
+          .getElementById("assets-panel")
+          .classList.toggle("active", name === "assets");
+        document
+          .getElementById("animation-panel")
+          .classList.toggle("active", name === "animation");
+      }
+      document.querySelectorAll(".bottom-tab").forEach((tab) => {
+        tab.onclick = () => {
+          switchTab(tab.dataset.tab);
+          if (tab.dataset.tab === "animation") renderAnimationEditor();
+        };
+      });
+
+      /* ============ ANIM EDITOR ============ */
+      function updateAnimPlayhead() {
+        const slider = document.getElementById("anim-time-slider");
+        const disp = document.getElementById("anim-time-display");
+        const playhead = document.getElementById("anim-playhead");
+        if (!state.currentAnimResource || !state.currentAnimClipId) return;
+        const clipRes = getRes(state.currentAnimClipId);
+        if (!clipRes) return;
+        const dur = clipRes.data.duration || 1;
+        slider.value = state.animCurrentTime;
+        disp.textContent = state.animCurrentTime.toFixed(2) + "s";
+        if (playhead)
+          playhead.style.left = (state.animCurrentTime / dur) * 100 + "%";
+      }
+      function renderAnimationEditor() {
+        const clipsList = document.getElementById("anim-clips-list");
+        const tracksEl = document.getElementById("anim-tracks");
+        const rulerEl = document.getElementById("anim-ruler");
+        const infoEl = document.getElementById("anim-info");
+        const selectEl = document.getElementById("anim-clip-select");
+        const playBtn = document.getElementById("anim-play-btn");
+        const animRes = state.currentAnimResource;
+        if (!animRes || !animRes.clips || animRes.clips.length === 0) {
+          clipsList.innerHTML = "";
+          tracksEl.innerHTML =
+            '<div class="anim-placeholder">Выберите узел AnimationMixer в дереве сцены<br>или ресурс Animation в ассетах</div>';
+          rulerEl.innerHTML = "";
+          selectEl.innerHTML = "";
+          playBtn.disabled = true;
+          infoEl.textContent = "Нет активной анимации";
+          return;
+        }
+        playBtn.disabled = false;
+        selectEl.innerHTML = animRes.clips
+          .map((id) => {
+            const c = getRes(id);
+            return `<option value="${id}" ${state.currentAnimClipId === id ? "selected" : ""}>${c?.name || "clip"}</option>`;
+          })
+          .join("");
+        selectEl.onchange = () => {
+          state.currentAnimClipId = selectEl.value;
+          state.animCurrentTime = 0;
+          state.selectedKeyframe = null;
+          const mixerNode = findActiveMixerNode();
+          if (mixerNode) {
+            const idx = animRes.clips.indexOf(state.currentAnimClipId);
+            if (idx !== -1) {
+              mixerNode.currentAnimIndex = idx;
+              rebuildMixerActions(mixerNode);
+              mixerNode.isPlaying = state.animIsPlaying;
+            }
+          }
+          renderAnimationEditor();
+          renderInspector();
+        };
+        playBtn.textContent = state.animIsPlaying ? "⏸" : "▶";
+        playBtn.onclick = () => {
+          state.animIsPlaying = !state.animIsPlaying;
+          playBtn.textContent = state.animIsPlaying ? "⏸" : "▶";
+          const mixerNode = findActiveMixerNode();
+          if (mixerNode && mixerNode.currentAction) {
+            mixerNode.isPlaying = state.animIsPlaying;
+            mixerNode.currentAction.paused = !state.animIsPlaying;
+          }
+        };
+        clipsList.innerHTML = "";
+        animRes.clips.forEach((clipId) => {
+          const c = getRes(clipId);
+          if (!c) return;
+          const el = document.createElement("div");
+          el.className =
+            "clip-item" + (state.currentAnimClipId === clipId ? " active" : "");
+          el.textContent = c.name;
+          el.onclick = () => {
+            state.currentAnimClipId = clipId;
+            state.animCurrentTime = 0;
+            state.selectedKeyframe = null;
+            const mixerNode = findActiveMixerNode();
+            if (mixerNode) {
+              const idx = animRes.clips.indexOf(clipId);
+              if (idx !== -1) {
+                mixerNode.currentAnimIndex = idx;
+                rebuildMixerActions(mixerNode);
+                mixerNode.isPlaying = state.animIsPlaying;
+              }
+            }
+            renderAnimationEditor();
+            renderInspector();
+          };
+          clipsList.appendChild(el);
+        });
+        if (
+          !state.currentAnimClipId ||
+          !animRes.clips.includes(state.currentAnimClipId)
+        )
+          state.currentAnimClipId = animRes.clips[0];
+        const clipRes = getRes(state.currentAnimClipId);
+        if (!clipRes) return;
+        const clip = clipRes.data;
+        const duration = Math.max(clip.duration, 0.001);
+        document.getElementById("anim-time-slider").max = duration;
+        rulerEl.innerHTML = "";
+        const tickCount = Math.ceil(duration * 5) + 1;
+        const step = duration / (tickCount - 1);
+        for (let i = 0; i < tickCount; i++) {
+          const t = i * step;
+          const pct = (t / duration) * 100;
+          const tick = document.createElement("div");
+          tick.className = "ruler-tick";
+          tick.style.left = pct + "%";
+          tick.textContent = t.toFixed(1) + "s";
+          rulerEl.appendChild(tick);
+        }
+        tracksEl.innerHTML = "";
+        const grouped = {};
+        clip.tracks.forEach((track) => {
+          const fullName = track.name;
+          const dotIdx = fullName.lastIndexOf(".");
+          const boneName =
+            dotIdx !== -1 ? fullName.substring(0, dotIdx) : "Root";
+          if (!grouped[boneName]) grouped[boneName] = [];
+          grouped[boneName].push(track);
+        });
+        const gh = document.createElement("div");
+        gh.className = "track-group-header";
+        gh.textContent = "Skeleton3D";
+        tracksEl.appendChild(gh);
+        for (const [boneName, tracks] of Object.entries(grouped)) {
+          tracks.forEach((track) => {
+            const row = document.createElement("div");
+            row.className = "track-row";
+            row.onclick = () => {
+              state.selectedKeyframe = null;
+              renderInspector();
+            };
+            const label = document.createElement("div");
+            label.className = "track-label";
+            label.textContent = `🦴 ${boneName} : ${track.name.substring(track.name.lastIndexOf(".") + 1)}`;
+            row.appendChild(label);
+            const bar = document.createElement("div");
+            bar.className = "track-bar";
+            const valSize = track.getValueSize();
+            const times = track.times;
+            const values = track.values;
+            for (let i = 0; i < times.length; i++) {
+              const t = times[i];
+              const pct = (t / duration) * 100;
+              const vals = [];
+              for (let j = 0; j < valSize; j++)
+                vals.push(+values[i * valSize + j].toFixed(4));
+              const kf = document.createElement("div");
+              kf.className = "keyframe";
+              kf.style.left = pct + "%";
+              kf.onclick = (e) => {
+                e.stopPropagation();
+                document
+                  .querySelectorAll(".keyframe.selected")
+                  .forEach((el) => el.classList.remove("selected"));
+                kf.classList.add("selected");
+                state.animCurrentTime = t;
+                state.selectedKeyframe = {
+                  trackIndex: clip.tracks.indexOf(track),
+                  keyIndex: i,
+                  trackName: track.name,
+                  time: t,
+                  values: vals.slice(),
+                };
+                updateAnimPlayhead();
+                renderInspector();
+                infoEl.textContent = `${track.name}  |  t = ${t.toFixed(4)}s  |  [${vals.map((v) => v.toFixed(4)).join(", ")}]`;
+              };
+              bar.appendChild(kf);
+            }
+            row.appendChild(bar);
+            tracksEl.appendChild(row);
+          });
+        }
+        infoEl.textContent = `${clip.name}  ·  ${clip.tracks.length} треков  ·  ${duration.toFixed(2)}s`;
+        updateAnimPlayhead();
+      }
+      document.getElementById("anim-time-slider").oninput = (e) => {
+        state.animCurrentTime = parseFloat(e.target.value);
+        updateAnimPlayhead();
+        const mixerNode = findActiveMixerNode();
+        if (mixerNode && mixerNode.currentAction) {
+          mixerNode.currentAction.time = state.animCurrentTime;
+          mixerNode.mixer.update(0);
+        }
+      };
+
+      /* ============ ASSETS ============ */
+      function isAssetVisible(r) {
+        if (r.type === "prefab" || r.type === "scene") return true;
+        if (r.type === "animation_clip") {
+          for (const a of allRes().filter((x) => x.type === "animation")) {
+            if (a.clips && a.clips.includes(r.id)) return false;
+          }
+        }
+        if (state.currentSceneResources.has(r.id)) return false;
+        for (const p of allRes().filter(
+          (x) => x.type === "prefab" || x.type === "scene",
+        )) {
+          if (p.internalResources && p.internalResources.includes(r))
+            return false;
+        }
+        return true;
+      }
+      function renderAssets() {
+        const grid = document.getElementById("asset-grid");
+        grid.innerHTML = "";
+        const items = [];
+        for (const r of allRes()) {
+          if (!isAssetVisible(r)) continue;
+          if (
+            state.assetFilter !== "all" &&
+            state.assetFilter !== r.type &&
+            !(state.assetFilter === "animation" && r.type === "animation_clip")
+          )
+            continue;
+          items.push(r);
+        }
+        for (const r of items) {
+          const el = document.createElement("div");
+          el.className = "asset-item";
+          el.draggable = true;
+          const th = document.createElement("div");
+          th.className = "asset-thumb";
+          const url = thumbFor(r);
+          th.innerHTML = url
+            ? `<img src="${url}" draggable="false">`
+            : `<span style="font-size:20px">${RES_ICON[r.type] || "?"}</span>`;
+          if (r.type === "scene" || r.type === "prefab") {
+            const badge = document.createElement("div");
+            badge.className = "ext-badge";
+            badge.textContent = r.type === "scene" ? "scene" : "glb";
+            th.appendChild(badge);
+          }
+          el.appendChild(th);
+          const lb = document.createElement("div");
+          lb.className = "label";
+          lb.textContent = r.name;
+          el.appendChild(lb);
+          el.onclick = () => selectResource(r);
+          el.oncontextmenu = (e) => {
+            e.preventDefault();
+            showContextMenu(e.clientX, e.clientY, r);
+          };
+          el.ondblclick = () => {
+            if (r.type === "prefab" || r.type === "scene") openScene(r.id);
+          };
+          el.ondragstart = (e) => {
+            e.dataTransfer.setData("text/plain", r.id);
+            currentDragType = r.type;
+          };
+          el.ondragend = () => {
+            currentDragType = null;
+          };
+          grid.appendChild(el);
+        }
+        document.getElementById("asset-count").textContent =
+          `(${items.length})`;
+      }
+      function thumbFor(r) {
+        if (r.type === "texture") return texURL(r.data);
+        if (r.type === "material") {
+          if (r.data.map) return texURL(r.data.map);
+          if (r.data.color) return solidURL("#" + r.data.color.getHexString());
+        }
+        return null;
+      }
+      function solidURL(c) {
+        const cv = document.createElement("canvas");
+        cv.width = cv.height = 64;
+        const x = cv.getContext("2d");
+        x.fillStyle = c;
+        x.fillRect(0, 0, 64, 64);
+        x.strokeStyle = "rgba(0,0,0,.3)";
+        x.strokeRect(0.5, 0.5, 63, 63);
+        return cv.toDataURL();
+      }
+      function texURL(t) {
+        if (!t?.image && !t?.isCanvasTexture) return null;
+        try {
+          const c = document.createElement("canvas");
+          if (t.image) {
+            c.width = t.image.width || 64;
+            c.height = t.image.height || 64;
+            c.getContext("2d").drawImage(t.image, 0, 0);
+          } else if (t.isCanvasTexture) {
+            c.width = t.source.data.width;
+            c.height = t.source.data.height;
+            c.getContext("2d").drawImage(t.source.data, 0, 0);
+          }
+          return c.toDataURL("image/png");
+        } catch {
+          return null;
+        }
+      }
+      document.querySelectorAll(".filter-btn").forEach((b) => {
+        b.onclick = () => {
+          document
+            .querySelectorAll(".filter-btn")
+            .forEach((x) => x.classList.remove("active"));
+          b.classList.add("active");
+          state.assetFilter = b.dataset.filter;
+          renderAssets();
+        };
+      });
+
+      /* ============ CONTEXT MENU ============ */
+      function newSceneResource() {
+        const name =
+          prompt("Имя новой сцены:", "Scene_" + Date.now()) ||
+          "Scene_" + Date.now();
+        const container = new THREE.Group();
+        container.name = name;
+        container.userData.isModelRoot = true;
+        const r = addRes(
+          new Resource("scene", name, container, { imported: true }),
+        );
+        r.internalNodes = [];
+        r.internalResources = [];
+        state.assetFilter = "all";
+        document
+          .querySelectorAll(".filter-btn")
+          .forEach((b) =>
+            b.classList.toggle("active", b.dataset.filter === "all"),
+          );
+        renderAssets();
+        selectResource(r);
+      }
+      function showContextMenu(x, y, targetRes = null) {
+        if (window.activeDropdown) window.activeDropdown.remove();
+        const menu = document.createElement("div");
+        menu.className = "res-dropdown";
+        if (targetRes) {
+          const h = document.createElement("div");
+          h.className = "dropdown-header";
+          h.textContent = targetRes.name;
+          menu.appendChild(h);
+          if (targetRes.type === "prefab" || targetRes.type === "scene") {
+            const open = document.createElement("div");
+            open.className = "dropdown-item";
+            open.textContent = "📂 Открыть сцену";
+            open.onclick = () => {
+              openScene(targetRes.id);
+              menu.remove();
+              window.activeDropdown = null;
+            };
+            menu.appendChild(open);
+          }
+          const del = document.createElement("div");
+          del.className = "dropdown-item";
+          del.style.color = "#ff8888";
+          del.textContent = "🗑 Удалить";
+          del.onclick = () => {
+            if (state.currentSceneResId === targetRes.id)
+              state.currentSceneResId = null;
+            library.delete(targetRes.id);
+            state.currentSceneResources.delete(targetRes.id);
+            renderAssets();
+            renderInspector();
+            menu.remove();
+            window.activeDropdown = null;
+          };
+          menu.appendChild(del);
+        } else {
+          const h = document.createElement("div");
+          h.className = "dropdown-header";
+          h.textContent = "Создать";
+          menu.appendChild(h);
+          const items = [
+            { label: "🗺️ New Scene", fn: () => newSceneResource() },
+            {
+              label: "△ New Mesh (Box)",
+              fn: () => {
+                const geo = new THREE.BoxGeometry(1, 1, 1);
+                const r = addRes(
+                  new Resource("mesh", "BoxMesh_" + (RES_ID + 1), geo),
+                );
+                state.currentSceneResources.add(r.id);
+                renderAssets();
+              },
+            },
+            {
+              label: "🎨 New Material",
+              fn: () => {
+                const mat = new THREE.MeshStandardMaterial({
+                  color: 0xcccccc,
+                  roughness: 0.5,
+                  metalness: 0.1,
+                });
+                const r = addRes(
+                  new Resource("material", "Material_" + (RES_ID + 1), mat),
+                );
+                state.currentSceneResources.add(r.id);
+                renderAssets();
+              },
+            },
+            {
+              label: "🖼 New Texture",
+              fn: () => {
+                const c = document.createElement("canvas");
+                c.width = c.height = 128;
+                const ctx = c.getContext("2d");
+                for (let yy = 0; yy < 128; yy += 16)
+                  for (let xx = 0; xx < 128; xx += 16) {
+                    ctx.fillStyle =
+                      ((xx + yy) / 16) % 2 === 0 ? "#ccc" : "#888";
+                    ctx.fillRect(xx, yy, 16, 16);
+                  }
+                const tex = new THREE.CanvasTexture(c);
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+                tex.needsUpdate = true;
+                const r = addRes(
+                  new Resource("texture", "Texture_" + (RES_ID + 1), tex),
+                );
+                tex.userData.resource = r;
+                state.currentSceneResources.add(r.id);
+                renderAssets();
+              },
+            },
+            {
+              label: "🎬 New Animation",
+              fn: () => {
+                const r = addRes(
+                  new Resource("animation", "Anim_" + (RES_ID + 1), null, {
+                    clips: [],
+                  }),
+                );
+                state.currentSceneResources.add(r.id);
+                renderAssets();
+              },
+            },
+          ];
+          for (const it of items) {
+            const el = document.createElement("div");
+            el.className = "dropdown-item";
+            el.textContent = it.label;
+            el.onclick = () => {
+              it.fn();
+              menu.remove();
+              window.activeDropdown = null;
+            };
+            menu.appendChild(el);
+          }
+          const h2 = document.createElement("div");
+          h2.className = "dropdown-header";
+          h2.textContent = "Импорт";
+          menu.appendChild(h2);
+          const imp = document.createElement("div");
+          imp.className = "dropdown-item";
+          imp.textContent = "📂 Импорт файла...";
+          imp.onclick = () => {
+            document.getElementById("file-input").click();
+            menu.remove();
+            window.activeDropdown = null;
+          };
+          menu.appendChild(imp);
+        }
+        menu.style.left = Math.min(x, window.innerWidth - 250) + "px";
+        menu.style.top = Math.min(y, window.innerHeight - 300) + "px";
+        menu.style.minWidth = "220px";
+        document.body.appendChild(menu);
+        window.activeDropdown = menu;
+        setTimeout(() => {
+          document.addEventListener("click", function close(ev) {
+            if (!menu.contains(ev.target)) {
+              menu.remove();
+              window.activeDropdown = null;
+              document.removeEventListener("click", close);
+            }
+          });
+        }, 0);
+      }
+      document.getElementById("asset-grid").oncontextmenu = (e) => {
+        if (e.target.closest(".asset-item")) return;
+        e.preventDefault();
+        showContextMenu(e.clientX, e.clientY, null);
+      };
+      document.getElementById("btn-add-asset").onclick = (e) => {
+        e.stopPropagation();
+        const rect = e.currentTarget.getBoundingClientRect();
+        showContextMenu(rect.left, rect.bottom + 4, null);
+      };
+      document.getElementById("btn-add-node").onclick = (e) => {
+        e.stopPropagation();
+        const rect = e.currentTarget.getBoundingClientRect();
+        if (window.activeDropdown) window.activeDropdown.remove();
+        const menu = document.createElement("div");
+        menu.className = "res-dropdown";
+        const h = document.createElement("div");
+        h.className = "dropdown-header";
+        h.textContent = "Добавить узел";
+        menu.appendChild(h);
+        const nodeTypes = [
+          {
+            icon: "◯",
+            label: "MeshInstance3D (Box)",
+            fn: createNodeMeshInstance,
+          },
+          { icon: "🖼", label: "Sprite3D (billboard)", fn: createNodeSprite3D },
+          { icon: "⬚", label: "Node3D (empty)", fn: createNodeEmpty },
+        ];
+        for (const nt of nodeTypes) {
+          const el = document.createElement("div");
+          el.className = "dropdown-item";
+          el.innerHTML = `<span>${nt.icon}</span> ${nt.label}`;
+          el.onclick = () => {
+            nt.fn();
+            menu.remove();
+            window.activeDropdown = null;
+          };
+          menu.appendChild(el);
+        }
+        menu.style.left = rect.left + "px";
+        menu.style.top = rect.bottom + 4 + "px";
+        menu.style.minWidth = "220px";
+        document.body.appendChild(menu);
+        window.activeDropdown = menu;
+        setTimeout(() => {
+          document.addEventListener("click", function close(ev) {
+            if (!menu.contains(ev.target)) {
+              menu.remove();
+              window.activeDropdown = null;
+              document.removeEventListener("click", close);
+            }
+          });
+        }, 0);
+      };
+
+      const viewportEl = document.getElementById("viewport");
+      const treePanelEl = document.getElementById("scene-tree-panel");
+      [viewportEl, treePanelEl].forEach((el) => {
+        el.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          if (currentDragType) {
+            e.dataTransfer.dropEffect = "copy";
+            el.classList.add("drag-over");
+          } else {
+            e.dataTransfer.dropEffect = "none";
+          }
+        });
+        el.addEventListener("dragleave", () =>
+          el.classList.remove("drag-over"),
+        );
+        el.addEventListener("drop", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          el.classList.remove("drag-over");
+          const resId = e.dataTransfer.getData("text/plain");
+          if (resId) {
+            const res = getRes(resId);
+            if (res) instantiateAssetInWorld(res);
+          }
+        });
+      });
+
+      /* ============ INSPECTOR ============ */
+      function renderInspector() {
+        const body = document.getElementById("inspector-body");
+        if (state.selectedKeyframe) {
+          const sk = state.selectedKeyframe;
+          let html = `<div class="insp-header" style="background:#0e639c;">Keyframe: ${sk.trackName.split(".").pop()}</div>`;
+          html += `<div class="insp-row"><label>Track</label><span style="font-size:10px;color:#aaa;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${sk.trackName}">${sk.trackName}</span></div>`;
+          html += `<div class="insp-row"><label>Time</label><input type="number" step="0.01" value="${sk.time.toFixed(4)}" id="kf-time"></div>`;
+          for (let j = 0; j < sk.values.length; j++)
+            html += `<div class="insp-row"><label>Val ${j}</label><input type="number" step="0.01" value="${sk.values[j].toFixed(4)}" id="kf-val-${j}"></div>`;
+          html += `<div class="insp-row"><button class="tiny" onclick="updateKeyframeData()" style="flex:1">Применить</button><button class="tiny ghost" onclick="state.selectedKeyframe=null; renderInspector();" style="margin-left:4px;">✕</button></div>`;
+          body.innerHTML = html;
+          return;
+        }
+        if (state.selectedResource) {
+          body.innerHTML =
+            `<div class="insp-header"><span>${RES_ICON[state.selectedResource.type]}</span><span>${state.selectedResource.name}</span></div>` +
+            renderResourceBody(state.selectedResource, null);
+          bindInspectorEvents();
+          return;
+        }
+        if (state.selectedNode) {
+          const node = state.selectedNode;
+          const o = node.object3d;
+          let html = `<div class="insp-header"><span>${NODE_ICON[node.type] || "·"}</span><span>${node.name}</span>
+      <button class="tiny danger" style="margin-left:auto;flex-shrink:0" onclick="deleteNode('${node.id}')">Удалить</button></div>`;
+          if (node.type === "SceneInstance") {
+            const sceneRes = node.refs.scene ? getRes(node.refs.scene) : null;
+            html += `<div class="insp-row"><label>Type</label><span>SceneInstance</span></div>`;
+            html += `<div class="insp-row"><label>Scene</label><span class="res-name" style="color:#a8c8e8;flex:1">${sceneRes ? sceneRes.name : "(missing)"}</span></div>`;
+            html += `<div class="insp-row"><button class="tiny" style="flex:1" onclick="openScene('${node.refs.scene}')">📂 Открыть сцену</button></div>`;
+            html += `<div class="insp-note">Дети скрыты. Нажмите "Открыть", чтобы редактировать.</div>`;
+            html += `<div class="insp-group">Transform</div>`;
+            const numIn = (p, a, v, st) =>
+              `<input type="number" step="${st}" value="${(+v).toFixed(3)}" data-node-id="${node.id}" data-node-prop="${p}" data-axis="${a}">`;
+            html += `<div class="insp-row"><label>Position</label>${["x", "y", "z"].map((a) => numIn("position", a, o.position[a], 0.01)).join("")}</div>`;
+            html += `<div class="insp-row"><label>Rotation°</label>${["x", "y", "z"].map((a) => numIn("rotation", a, (o.rotation[a] * 180) / Math.PI, 1)).join("")}</div>`;
+            html += `<div class="insp-row"><label>Scale</label>${["x", "y", "z"].map((a) => numIn("scale", a, o.scale[a], 0.01)).join("")}</div>`;
+            body.innerHTML = html;
+            bindInspectorEvents();
+            return;
+          }
+          if (node.type === "Skeleton3D") {
+            html += `<div class="insp-row"><label>Bones</label><span>${node.bones.length}</span></div>`;
+            html += renderSkeletonUI(node);
+          } else if (node.type === "AnimationMixer") {
+            html += `<div class="insp-group" style="margin-top:0;border-top:none;">Animation</div>`;
+            html += renderResourceSlot(
+              node,
+              "animation",
+              ["animation"],
+              "Resource",
+              node,
+            );
+            const animId = node.refs.animation;
+            const animRes = animId ? getRes(animId) : null;
+            if (!animRes) {
+              html += `<div class="insp-note" style="text-align:center;padding:8px;"><button class="tiny" onclick="createAnimResourceForMixer('${node.id}')">+ Создать Animation</button></div>`;
+            } else if (animRes.clips.length > 0) {
+              const clipOpts = animRes.clips
+                .map((id, i) => {
+                  const c = getRes(id);
+                  return `<option value="${i}" ${i === node.currentAnimIndex ? "selected" : ""}>${c?.name || "clip_" + i}</option>`;
+                })
+                .join("");
+              html += `<div class="insp-row"><label>Current</label><select id="mixer-anim-select" style="flex:1">${clipOpts}</select></div>`;
+              html += `<div class="insp-row"><label>Playing</label><input type="checkbox" id="mixer-playing-checkbox" ${node.isPlaying ? "checked" : ""}></div>`;
+              html += `<div class="insp-row"><label>Loop</label><input type="checkbox" id="mixer-loop-checkbox" ${node.loop ? "checked" : ""}></div>`;
+              html += `<div class="insp-row"><label>Speed</label><input type="number" step="0.1" min="0" value="${node.timeScale}" id="mixer-speed-input" style="width:60px"></div>`;
+            } else {
+              html += `<div class="insp-note" style="text-align:center;padding:8px;"><button class="tiny" onclick="addEmptyClipToAnim('${animRes.id}')">+ Добавить клип</button></div>`;
+            }
+          } else {
+            html += `<div class="insp-group">Transform</div>`;
+            const numIn = (p, a, v, st) =>
+              `<input type="number" step="${st}" value="${(+v).toFixed(3)}" data-node-id="${node.id}" data-node-prop="${p}" data-axis="${a}">`;
+            html += `<div class="insp-row"><label>Position</label>${["x", "y", "z"].map((a) => numIn("position", a, o.position[a], 0.01)).join("")}</div>
+        <div class="insp-row"><label>Rotation°</label>${["x", "y", "z"].map((a) => numIn("rotation", a, (o.rotation[a] * 180) / Math.PI, 1)).join("")}</div>
+        <div class="insp-row"><label>Scale</label>${["x", "y", "z"].map((a) => numIn("scale", a, o.scale[a], 0.01)).join("")}</div>`;
+          }
+          if (
+            node.type === "MeshInstance3D" ||
+            node.type === "SkinnedMeshInstance3D"
+          ) {
+            html += `<div class="insp-group">Properties</div>`;
+            html += renderResourceSlot(node, "mesh", ["mesh"], "Mesh", node);
+          }
+          if (node.type === "Sprite3D") {
+            html += `<div class="insp-group">Properties</div>`;
+            html += renderResourceSlot(
+              node,
+              "texture",
+              ["texture"],
+              "Texture",
+              node,
+            );
+          }
+          body.innerHTML = html;
+          bindInspectorEvents();
+          return;
+        }
+        body.innerHTML =
+          '<div class="placeholder">Выберите узел или ресурс</div>';
+      }
+
+      window.updateKeyframeData = function () {
+        if (!state.selectedKeyframe) return;
+        const sk = state.selectedKeyframe;
+        const clipRes = getRes(state.currentAnimClipId);
+        if (!clipRes) return;
+        const clip = clipRes.data;
+        const track = clip.tracks[sk.trackIndex];
+        if (!track) return;
+        const newTime = parseFloat(document.getElementById("kf-time").value);
+        const valSize = track.getValueSize();
+        const newVals = [];
+        for (let j = 0; j < valSize; j++)
+          newVals.push(
+            parseFloat(document.getElementById(`kf-val-${j}`).value),
+          );
+        const timesArr = Array.from(track.times);
+        timesArr[sk.keyIndex] = newTime;
+        track.times = new Float32Array(timesArr);
+        const valsArr = Array.from(track.values);
+        for (let j = 0; j < valSize; j++)
+          valsArr[sk.keyIndex * valSize + j] = newVals[j];
+        track.values = new Float32Array(valsArr);
+        clip.resetDuration();
+        const mixerNode = findActiveMixerNode();
+        if (mixerNode) rebuildMixerActions(mixerNode);
+        renderAnimationEditor();
+        state.selectedKeyframe = null;
+        renderInspector();
+      };
+      window.createAnimResourceForMixer = function (nodeId) {
+        const node = findNode(nodeId);
+        if (!node) return;
+        const res = addRes(
+          new Resource("animation", "NewAnimation_" + (RES_ID + 1), null, {
+            clips: [],
+          }),
+        );
+        node.refs.animation = res.id;
+        state.currentSceneResources.add(res.id);
+        renderInspector();
+      };
+      window.addEmptyClipToAnim = function (animId) {
+        const animRes = getRes(animId);
+        if (!animRes) return;
+        const clip = new THREE.AnimationClip(
+          "Clip_" + (animRes.clips.length + 1),
+          1.0,
+          [],
+        );
+        const clipRes = addRes(new Resource("animation_clip", clip.name, clip));
+        animRes.clips.push(clipRes.id);
+        state.currentSceneResources.add(clipRes.id);
+        renderInspector();
+        renderAnimationEditor();
+      };
+      window.resetOverride = function (nodeId, resId, prop) {
+        const node = findNode(nodeId);
+        if (!node || !node.overrides || !node.overrides[resId]) return;
+        delete node.overrides[resId][prop];
+        if (Object.keys(node.overrides[resId]).length === 0)
+          delete node.overrides[resId];
+        sync3DScene();
+        renderInspector();
+      };
+      function getValWithOverride(res, prop, contextNode) {
+        if (
+          contextNode &&
+          contextNode.overrides &&
+          contextNode.overrides[res.id] &&
+          contextNode.overrides[res.id][prop] !== undefined
+        ) {
+          return contextNode.overrides[res.id][prop];
+        }
+        return res.refs[prop] !== undefined ? res.refs[prop] : res.data[prop];
+      }
+
+      function renderResourceBody(res, contextNode) {
+        if (res.type === "prefab" || res.type === "scene")
+          return renderPrefabBody(res);
+        let html = "";
+        if (res.type === "mesh") {
+          html += `<div class="insp-group" style="margin-top:0;border-top:none;">Surfaces</div>`;
+          html += renderResourceSlot(
+            res,
+            "material",
+            ["material"],
+            "Material",
+            contextNode,
+          );
+        } else if (res.type === "material") {
+          const isOv = contextNode && isAssetVisible(res);
+          const renderRow = (label, prop, inputHtml) => {
+            const hasOv =
+              isOv &&
+              contextNode.overrides[res.id] &&
+              contextNode.overrides[res.id][prop] !== undefined;
+            return `<div class="insp-row"><label>${label}</label>${inputHtml}${hasOv ? `<button class="reset-btn" onclick="resetOverride('${contextNode.id}', '${res.id}', '${prop}')" title="Сбросить">↺</button>` : ""}</div>`;
+          };
+          const albedoId = res.id + "_albedo";
+          html += `<div class="prop-section ${collapsedSections.has(albedoId) ? "" : "expanded"}">`;
+          html += `<div class="prop-section-header" onclick="toggleSection('${albedoId}')"><span class="arrow">▶</span> Albedo</div>`;
+          html += `<div class="prop-section-body">`;
+          const colVal = getValWithOverride(res, "color", contextNode);
+          html += renderRow(
+            "Color",
+            "color",
+            `<input type="color" value="${typeof colVal === "string" ? colVal : "#" + res.data.color.getHexString()}" data-mat-id="${res.id}" data-mat-prop="color">`,
+          );
+          html += renderResourceSlot(
+            res,
+            "albedo",
+            ["texture"],
+            "Texture",
+            contextNode,
+          );
+          html += `</div></div>`;
+          const metalId = res.id + "_metal";
+          html += `<div class="prop-section ${collapsedSections.has(metalId) ? "" : "expanded"}">`;
+          html += `<div class="prop-section-header" onclick="toggleSection('${metalId}')"><span class="arrow">▶</span> Metallic / Roughness</div>`;
+          html += `<div class="prop-section-body">`;
+          const metVal = getValWithOverride(res, "metalness", contextNode);
+          html += renderRow(
+            "Metallic",
+            "metalness",
+            `<input type="range" min="0" max="1" step="0.01" value="${metVal}" data-mat-id="${res.id}" data-mat-prop="metalness"><span class="val">${Number(metVal).toFixed(2)}</span>`,
+          );
+          const rouVal = getValWithOverride(res, "roughness", contextNode);
+          html += renderRow(
+            "Rough",
+            "roughness",
+            `<input type="range" min="0" max="1" step="0.01" value="${rouVal}" data-mat-id="${res.id}" data-mat-prop="roughness"><span class="val">${Number(rouVal).toFixed(2)}</span>`,
+          );
+          html += `</div></div>`;
+          const normalId = res.id + "_normal";
+          html += `<div class="prop-section ${collapsedSections.has(normalId) ? "" : "expanded"}">`;
+          html += `<div class="prop-section-header" onclick="toggleSection('${normalId}')"><span class="arrow">▶</span> Normal</div>`;
+          html += `<div class="prop-section-body">`;
+          html += renderResourceSlot(
+            res,
+            "normal",
+            ["texture"],
+            "Texture",
+            contextNode,
+          );
+          html += `</div></div>`;
+        } else if (res.type === "texture") {
+          const tex = res.data;
+          const u = texURL(tex);
+          const dim = tex.image
+            ? `${tex.image.width}×${tex.image.height}`
+            : "?";
+          html += `<div class="insp-row"><label>Size</label><span style="color:#8a8a8a;font-family:Consolas;font-size:10px">${dim}</span></div>`;
+          if (u)
+            html += `<div style="padding:4px"><img src="${u}" class="tex-preview" draggable="false"></div>`;
+          const fid = res.id + "_filt";
+          html += `<div class="prop-section ${collapsedSections.has(fid) ? "" : "expanded"}">`;
+          html += `<div class="prop-section-header" onclick="toggleSection('${fid}')"><span class="arrow">▶</span> Filtering</div>`;
+          html += `<div class="prop-section-body">`;
+          html += `<div class="insp-row"><label>Min Filter</label>
+      <select data-tex-id="${res.id}" data-tex-prop="minFilter" style="flex:1">
+        <option value="1003" ${tex.minFilter === 1003 ? "selected" : ""}>Nearest</option>
+        <option value="1006" ${tex.minFilter === 1006 ? "selected" : ""}>Linear</option>
+        <option value="1004" ${tex.minFilter === 1004 ? "selected" : ""}>Nearest Mipmap Nearest</option>
+        <option value="1005" ${tex.minFilter === 1005 ? "selected" : ""}>Nearest Mipmap Linear</option>
+        <option value="1007" ${tex.minFilter === 1007 ? "selected" : ""}>Linear Mipmap Nearest</option>
+        <option value="1008" ${tex.minFilter === 1008 ? "selected" : ""}>Linear Mipmap Linear</option>
+      </select></div>`;
+          html += `<div class="insp-row"><label>Mag Filter</label>
+      <select data-tex-id="${res.id}" data-tex-prop="magFilter" style="flex:1">
+        <option value="1003" ${tex.magFilter === 1003 ? "selected" : ""}>Nearest</option>
+        <option value="1006" ${tex.magFilter === 1006 ? "selected" : ""}>Linear</option>
+      </select></div>`;
+          html += `</div></div>`;
+          const wid = res.id + "_wrap";
+          html += `<div class="prop-section ${collapsedSections.has(wid) ? "" : "expanded"}">`;
+          html += `<div class="prop-section-header" onclick="toggleSection('${wid}')"><span class="arrow">▶</span> Wrapping</div>`;
+          html += `<div class="prop-section-body">`;
+          html += `<div class="insp-row"><label>Wrap S</label>
+      <select data-tex-id="${res.id}" data-tex-prop="wrapS" style="flex:1">
+        <option value="1000" ${tex.wrapS === 1000 ? "selected" : ""}>Repeat</option>
+        <option value="1001" ${tex.wrapS === 1001 ? "selected" : ""}>Clamp to Edge</option>
+        <option value="1002" ${tex.wrapS === 1002 ? "selected" : ""}>Mirror</option>
+      </select></div>`;
+          html += `<div class="insp-row"><label>Wrap T</label>
+      <select data-tex-id="${res.id}" data-tex-prop="wrapT" style="flex:1">
+        <option value="1000" ${tex.wrapT === 1000 ? "selected" : ""}>Repeat</option>
+        <option value="1001" ${tex.wrapT === 1001 ? "selected" : ""}>Clamp to Edge</option>
+        <option value="1002" ${tex.wrapT === 1002 ? "selected" : ""}>Mirror</option>
+      </select></div>`;
+          html += `</div></div>`;
+          const tid = res.id + "_tf";
+          html += `<div class="prop-section ${collapsedSections.has(tid) ? "" : "expanded"}">`;
+          html += `<div class="prop-section-header" onclick="toggleSection('${tid}')"><span class="arrow">▶</span> Transform</div>`;
+          html += `<div class="prop-section-body">`;
+          html += `<div class="insp-row"><label>Repeat</label>
+      <input type="number" step="0.1" value="${tex.repeat.x}" data-tex-id="${res.id}" data-tex-prop="repeatX" title="X">
+      <input type="number" step="0.1" value="${tex.repeat.y}" data-tex-id="${res.id}" data-tex-prop="repeatY" title="Y">
+    </div>`;
+          html += `<div class="insp-row"><label>Offset</label>
+      <input type="number" step="0.1" value="${tex.offset.x}" data-tex-id="${res.id}" data-tex-prop="offsetX" title="X">
+      <input type="number" step="0.1" value="${tex.offset.y}" data-tex-id="${res.id}" data-tex-prop="offsetY" title="Y">
+    </div>`;
+          html += `<div class="insp-row"><label>Rotation°</label>
+      <input type="number" step="5" value="${((tex.rotation * 180) / Math.PI).toFixed(0)}" data-tex-id="${res.id}" data-tex-prop="rotationDeg">
+    </div>`;
+          html += `<div class="insp-row"><label>Flip Y</label>
+      <input type="checkbox" ${tex.flipY ? "checked" : ""} data-tex-id="${res.id}" data-tex-prop="flipY">
+    </div>`;
+          html += `</div></div>`;
+        } else if (res.type === "animation") {
+          html += `<div class="insp-row"><button class="tiny" onclick="switchTab('animation');renderAnimationEditor()">▶ Открыть в редакторе</button></div>`;
+          html += `<div class="insp-group" style="margin-top:0;border-top:none;">Animation Clips (${res.clips.length})</div>`;
+          res.clips.forEach((clipId, i) => {
+            const c = getRes(clipId);
+            if (!c) return;
+            html += `<div class="insp-row" style="cursor:pointer" onclick="selectResById('${c.id}')">
+        <span style="color:#666;width:20px">[${i}]</span>
+        <span>${RES_ICON.animation_clip}</span> <span class="res-name" style="color:#a8c8e8">${c.name}</span>
+        <span style="color:#666;margin-left:auto">${c.data.duration.toFixed(2)}s</span>
+      </div>`;
+          });
+        } else if (res.type === "animation_clip") {
+          const clip = res.data;
+          html += `<div class="insp-row"><button class="tiny" onclick="switchTab('animation');renderAnimationEditor()">▶ Открыть в редакторе</button></div>`;
+          html += `<div class="insp-row"><label>Duration</label><span>${clip.duration.toFixed(2)}s</span></div>`;
+          html += `<div class="insp-row"><label>Tracks</label><span>${clip.tracks.length}</span></div>`;
+        }
+        return html;
+      }
+
+      function renderPrefabBody(res) {
+        let html = `<div class="insp-note">Дважды кликните в Assets, чтобы открыть как сцену.</div>`;
+        html += `<div class="insp-row"><button class="tiny" onclick="openScene('${res.id}')">📂 Открыть сцену</button></div>`;
+        html += `<div class="insp-row"><button class="tiny" onclick="toggleJSON('${res.id}')">📄 JSON</button></div>`;
+        if (window["_json_" + res.id]) {
+          html += `<div class="json-view">${highlightJSON(JSON.stringify(serializePrefab(res), null, 2))}</div>`;
+        }
+        html += `<div class="insp-group">Nodes (${res.internalNodes?.length || 0})</div>`;
+        if (res.internalNodes && res.internalNodes.length) {
+          res.internalNodes.forEach((node, i) => {
+            html += `<div class="insp-row" style="cursor:pointer" onclick="selectNodeById('${node.id}')"><span style="color:#666;width:20px">[${i}]</span><span>${NODE_ICON[node.type] || "·"}</span> <span class="res-name" style="color:#a8c8e8">${node.name}</span></div>`;
+          });
+        } else {
+          html += `<div class="insp-note" style="color:#555;font-style:italic">Нет узлов</div>`;
+        }
+        html += `<div class="insp-group">Resources (${res.internalResources?.length || 0})</div>`;
+        if (res.internalResources && res.internalResources.length) {
+          res.internalResources.forEach((r, i) => {
+            html += `<div class="insp-row" style="cursor:pointer" onclick="selectResById('${r.id}')"><span style="color:#666;width:20px">[${i}]</span><span>${RES_ICON[r.type]}</span> <span class="res-name" style="color:#a8c8e8">${r.name}</span></div>`;
+          });
+        } else {
+          html += `<div class="insp-note" style="color:#555;font-style:italic">Нет ресурсов</div>`;
+        }
+        return html;
+      }
+      window.toggleJSON = function (resId) {
+        if (window["_json_" + resId]) delete window["_json_" + resId];
+        else window["_json_" + resId] = true;
+        renderInspector();
+      };
+      function highlightJSON(str) {
+        return str
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(
+            /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+            (m) => {
+              let cls = "json-number";
+              if (/^"/.test(m)) cls = /:$/.test(m) ? "json-key" : "json-string";
+              else if (/true|false/.test(m)) cls = "json-bool";
+              return `<span class="${cls}">${m}</span>`;
+            },
+          );
+      }
+
+      /* ============ SERIALIZE ============ */
+      function serializePrefab(res) {
+        const resources = [];
+        const seen = new Set();
+        for (const r of res.internalResources) {
+          if (seen.has(r.id)) continue;
+          seen.add(r.id);
+          if (r.type === "mesh") resources.push(serializeMesh(r));
+          else if (r.type === "material") resources.push(serializeMaterial(r));
+          else if (r.type === "texture") resources.push(serializeTexture(r));
+          else if (r.type === "animation")
+            resources.push(serializeAnimationRes(r));
+          else if (r.type === "animation_clip")
+            resources.push(serializeAnimationClip(r));
+        }
+        const nodes = [];
+        function traverse(obj) {
+          if (obj.isBone) return null;
+          if (obj.userData.isSceneInstance) {
+            const node = {
+              type: "SceneInstance",
+              name: obj.name || "SceneInstance",
+            };
+            if (
+              obj.position.x !== 0 ||
+              obj.position.y !== 0 ||
+              obj.position.z !== 0
+            )
+              node.position = [
+                +obj.position.x.toFixed(4),
+                +obj.position.y.toFixed(4),
+                +obj.position.z.toFixed(4),
+              ];
+            if (
+              obj.rotation.x !== 0 ||
+              obj.rotation.y !== 0 ||
+              obj.rotation.z !== 0
+            )
+              node.rotation = [
+                +obj.rotation.x.toFixed(4),
+                +obj.rotation.y.toFixed(4),
+                +obj.rotation.z.toFixed(4),
+              ];
+            if (obj.scale.x !== 1 || obj.scale.y !== 1 || obj.scale.z !== 1)
+              node.scale = [
+                +obj.scale.x.toFixed(4),
+                +obj.scale.y.toFixed(4),
+                +obj.scale.z.toFixed(4),
+              ];
+            const sceneId = obj.userData.sceneResId;
+            if (sceneId) {
+              const sr = getRes(sceneId);
+              node.scene = sr ? `@external:${sr.name}` : null;
+            }
+            return node;
+          }
+          const nodeType = classifyObject(obj);
+          const node = { type: nodeType, name: obj.name || nodeType };
+          if (
+            obj.position.x !== 0 ||
+            obj.position.y !== 0 ||
+            obj.position.z !== 0
+          )
+            node.position = [
+              +obj.position.x.toFixed(4),
+              +obj.position.y.toFixed(4),
+              +obj.position.z.toFixed(4),
+            ];
+          if (
+            obj.rotation.x !== 0 ||
+            obj.rotation.y !== 0 ||
+            obj.rotation.z !== 0
+          )
+            node.rotation = [
+              +obj.rotation.x.toFixed(4),
+              +obj.rotation.y.toFixed(4),
+              +obj.rotation.z.toFixed(4),
+            ];
+          if (obj.scale.x !== 1 || obj.scale.y !== 1 || obj.scale.z !== 1)
+            node.scale = [
+              +obj.scale.x.toFixed(4),
+              +obj.scale.y.toFixed(4),
+              +obj.scale.z.toFixed(4),
+            ];
+          if (obj.isMesh && obj.geometry?.userData?.resource)
+            node.mesh = `@internal:${obj.geometry.userData.resource.name}`;
+          if (obj.isSprite && obj.material?.map?.userData?.resource)
+            node.texture = `@internal:${obj.material.map.userData.resource.name}`;
+          if (nodeType === "Skeleton3D") {
+            const bones = [];
+            obj.traverse((o) => {
+              if (!o.isBone) return;
+              let parentBone = null;
+              let p = o.parent;
+              while (p) {
+                if (p.isBone) {
+                  parentBone = p.name;
+                  break;
+                }
+                p = p.parent;
+              }
+              const b = { name: o.name, parent: parentBone };
+              if (
+                o.position.x !== 0 ||
+                o.position.y !== 0 ||
+                o.position.z !== 0
+              )
+                b.position = [
+                  +o.position.x.toFixed(4),
+                  +o.position.y.toFixed(4),
+                  +o.position.z.toFixed(4),
+                ];
+              if (
+                o.quaternion.x !== 0 ||
+                o.quaternion.y !== 0 ||
+                o.quaternion.z !== 0 ||
+                o.quaternion.w !== 1
+              )
+                b.rotation = [
+                  +o.quaternion.x.toFixed(4),
+                  +o.quaternion.y.toFixed(4),
+                  +o.quaternion.z.toFixed(4),
+                  +o.quaternion.w.toFixed(4),
+                ];
+              if (o.scale.x !== 1 || o.scale.y !== 1 || o.scale.z !== 1)
+                b.scale = [
+                  +o.scale.x.toFixed(4),
+                  +o.scale.y.toFixed(4),
+                  +o.scale.z.toFixed(4),
+                ];
+              bones.push(b);
+            });
+            node.bones = bones;
+            return node;
+          }
+          const children = [];
+          for (const c of obj.children) {
+            if (c.isBone) continue;
+            const cn = traverse(c);
+            if (cn) children.push(cn);
+          }
+          if (children.length) node.children = children;
+          return node;
+        }
+        if (res.data) {
+          for (const child of res.data.children) {
+            const cn = traverse(child);
+            if (cn) nodes.push(cn);
+          }
+        }
+        return {
+          type: res.type === "scene" ? "Scene" : "Prefab",
+          extension: res.type === "scene" ? "scene" : "glb",
+          name: res.name,
+          resources,
+          nodes,
+        };
+      }
+      function serializeMesh(r) {
+        const geo = r.data;
+        const attributes = {};
+        for (const [name, attr] of Object.entries(geo.attributes)) {
+          const sample = [];
+          const n = Math.min(attr.count, 5);
+          for (let i = 0; i < n; i++) {
+            const v = [];
+            for (let j = 0; j < attr.itemSize; j++)
+              v.push(+attr.array[i * attr.itemSize + j].toFixed(4));
+            sample.push(v);
+          }
+          attributes[name] = {
+            itemSize: attr.itemSize,
+            count: attr.count,
+            sample,
+            note: attr.count > 5 ? `... всего ${attr.count}` : undefined,
+          };
+        }
+        return {
+          type: "ArrayMesh",
+          name: r.name,
+          vertexCount: geo.attributes.position?.count || 0,
+          indexCount: geo.index ? geo.index.count : 0,
+          attributes,
+          material: r.refs.material
+            ? `@internal:${getRes(r.refs.material).name}`
+            : null,
+        };
+      }
+      function serializeMaterial(r) {
+        const mat = r.data;
+        const parameters = {};
+        if (!mat.color.equals(new THREE.Color(0xffffff)))
+          parameters["Albedo.color"] = "#" + mat.color.getHexString();
+        if (mat.metalness !== 0.0) parameters["Metallic"] = mat.metalness;
+        if (mat.roughness !== 1.0) parameters["Roughness"] = mat.roughness;
+        for (const [slot, texId] of Object.entries(r.refs)) {
+          const texRes = getRes(texId);
+          if (texRes)
+            parameters[`${slot[0].toUpperCase() + slot.slice(1)}.texture`] =
+              `@internal:${texRes.name}`;
+        }
+        return { type: "Material", name: r.name, parameters };
+      }
+      function serializeTexture(r) {
+        const tex = r.data;
+        const dims = tex.image
+          ? { width: tex.image.width, height: tex.image.height }
+          : {};
+        return {
+          type: "Texture2D",
+          name: r.name,
+          ...dims,
+          repeat: [tex.repeat.x, tex.repeat.y],
+          offset: [tex.offset.x, tex.offset.y],
+          rotation: tex.rotation,
+          wrapS: tex.wrapS,
+          wrapT: tex.wrapT,
+        };
+      }
+      function serializeAnimationRes(r) {
+        return {
+          type: "Animation",
+          name: r.name,
+          clips: r.clips
+            .map((id) => {
+              const c = getRes(id);
+              return c ? `@internal:${c.name}` : null;
+            })
+            .filter(Boolean),
+        };
+      }
+      function serializeAnimationClip(r) {
+        const clip = r.data;
+        return {
+          type: "AnimationClip",
+          name: r.name,
+          duration: +clip.duration.toFixed(3),
+          tracks: clip.tracks.map((track) => {
+            const dotIdx = track.name.lastIndexOf(".");
+            const valueSize = track.getValueSize();
+            const frames = [];
+            for (let i = 0; i < track.times.length; i++) {
+              const vals = [];
+              for (let j = 0; j < valueSize; j++)
+                vals.push(+track.values[i * valueSize + j].toFixed(4));
+              frames.push({ t: +track.times[i].toFixed(4), v: vals });
+            }
+            return {
+              bone: track.name.substring(0, dotIdx),
+              property: track.name.substring(dotIdx + 1),
+              valueSize,
+              frames,
+            };
+          }),
+        };
+      }
+
+      /* ============ RESOURCE SLOT ============ */
+      function renderResourceSlot(
+        owner,
+        slotName,
+        allowedTypes,
+        label,
+        contextNode = null,
+      ) {
+        let resId = owner.refs[slotName];
+        if (
+          contextNode &&
+          contextNode.overrides &&
+          contextNode.overrides[owner.id] &&
+          contextNode.overrides[owner.id][slotName] !== undefined
+        ) {
+          resId = contextNode.overrides[owner.id][slotName];
+        }
+        const res = resId ? getRes(resId) : null;
+        const isExpanded = res && expandedResources.has(res.id);
+        const typesStr = allowedTypes.join(",");
+        if (!res) {
+          return `<div class="prop-block"><div class="prop-row"><label>${label}</label>
+      <div class="prop-slot empty" data-owner-id="${owner.id}" data-slot="${slotName}" data-types="${typesStr}" data-ctx="${contextNode?.id || ""}" onclick="openEmptySlotMenu(event, '${owner.id}', '${slotName}', '${typesStr}', '${contextNode?.id || ""}')">
+        <span class="empty-name">[ None ]</span><span class="slot-arrow">▼</span>
+      </div></div></div>`;
+        }
+        return `<div class="prop-block ${isExpanded ? "expanded" : ""}">
+    <div class="prop-row">
+      <label>${label}</label>
+      <div class="prop-slot" data-owner-id="${owner.id}" data-slot="${slotName}" data-types="${typesStr}" data-ctx="${contextNode?.id || ""}" onclick="toggleResourceExpand('${res.id}')">
+        <span>${RES_ICON[res.type]}</span><span class="res-name">${res.name}</span>
+      </div>
+      <button class="slot-menu-btn" onclick="event.stopPropagation(); openResourceMenu(event, '${owner.id}', '${slotName}', '${typesStr}', '${contextNode?.id || ""}')" title="⋮">⋮</button>
+    </div>
+    ${isExpanded ? `<div class="prop-expanded-body">${renderResourceBody(res, contextNode)}</div>` : ""}
+  </div>`;
+      }
+      function renderSkeletonUI(node) {
+        const bones = node.bones || [];
+        const sel = state.selectedBone;
+        let html = `<div class="insp-group">Bone Hierarchy</div><div style="max-height:150px;overflow-y:auto;background:#222;padding:4px;">`;
+        for (const b of bones)
+          html += `<div class="tree-item ${sel === b ? "sel" : ""}" onclick="selectBone('${b.name}')">🦴 ${b.name}</div>`;
+        html += `</div>`;
+        if (sel) {
+          html += `<div class="insp-group">Bone: ${sel.name}</div>`;
+          html += `<div class="insp-row"><label>Pos</label>${["x", "y", "z"].map((a) => `<input type="number" step="0.01" value="${sel.position[a].toFixed(3)}" oninput="moveBone('${sel.name}','position','${a}',this.value)">`).join("")}</div>`;
+          html += `<div class="insp-row"><label>Rot°</label>${["x", "y", "z"].map((a) => `<input type="number" step="1" value="${((sel.rotation[a] * 180) / Math.PI).toFixed(1)}" oninput="moveBone('${sel.name}','rotation','${a}',this.value)">`).join("")}</div>`;
+        }
+        return html;
+      }
+      window.selectNodeById = (id) => {
+        const n = findNode(id);
+        if (n) selectNode(n);
+      };
+      window.selectResById = (id) => {
+        const r = getRes(id);
+        if (r) selectResource(r);
+      };
+      window.toggleResourceExpand = function (resId) {
+        if (expandedResources.has(resId)) expandedResources.delete(resId);
+        else expandedResources.add(resId);
+        renderInspector();
+      };
+      window.toggleSection = function (id) {
+        if (collapsedSections.has(id)) collapsedSections.delete(id);
+        else collapsedSections.add(id);
+        renderInspector();
+      };
+      function getOwningPrefabId(owner) {
+        if (!owner) return null;
+        if (owner.object3d) {
+          if (owner.refs?.prefab) return owner.refs.prefab;
+          if (owner.refs?.scene) return owner.refs.scene;
+          let p = owner.parent;
+          while (p) {
+            if (p.refs?.prefab) return p.refs.prefab;
+            if (p.refs?.scene) return p.refs.scene;
+            p = p.parent;
+          }
+        } else if (owner.owner) {
+          const parentNode = findNode(owner.owner);
+          if (parentNode) return getOwningPrefabId(parentNode);
+        }
+        return null;
+      }
+      window.openEmptySlotMenu = function (
+        e,
+        ownerId,
+        slotName,
+        typesStr,
+        ctxId,
+      ) {
+        e.stopPropagation();
+        const rect = e.currentTarget.getBoundingClientRect();
+        if (window.activeDropdown) window.activeDropdown.remove();
+        const owner = getRes(ownerId) || findNode(ownerId);
+        const ctx = ctxId ? findNode(ctxId) : null;
+        showResourcePicker(rect, owner, slotName, typesStr.split(","), ctx);
+      };
+      window.openResourceMenu = function (
+        e,
+        ownerId,
+        slotName,
+        typesStr,
+        ctxId,
+      ) {
+        e.stopPropagation();
+        const rect = e.currentTarget.getBoundingClientRect();
+        if (window.activeDropdown) window.activeDropdown.remove();
+        const owner = getRes(ownerId) || findNode(ownerId);
+        const ctx = ctxId ? findNode(ctxId) : null;
+        let resId = owner.refs[slotName];
+        if (
+          ctx &&
+          ctx.overrides &&
+          ctx.overrides[owner.id] &&
+          ctx.overrides[owner.id][slotName] !== undefined
+        ) {
+          resId = ctx.overrides[owner.id][slotName];
+        }
+        const res = resId ? getRes(resId) : null;
+        const allowed = typesStr.split(",");
+        const menu = document.createElement("div");
+        menu.className = "res-dropdown";
+        if (res) {
+          const change = document.createElement("div");
+          change.className = "dropdown-item";
+          change.textContent = "Сменить ресурс...";
+          change.onclick = () => {
+            menu.remove();
+            window.activeDropdown = null;
+            showResourcePicker(rect, owner, slotName, allowed, ctx);
+          };
+          menu.appendChild(change);
+          const isInternal = !isAssetVisible(res);
+          const conv = document.createElement("div");
+          conv.className = "dropdown-item";
+          if (isInternal) {
+            conv.textContent = "Сделать External";
+            conv.onclick = () => {
+              const prefabId = getOwningPrefabId(owner);
+              if (prefabId) {
+                const p = getRes(prefabId);
+                if (p?.internalResources)
+                  p.internalResources = p.internalResources.filter(
+                    (r) => r.id !== res.id,
+                  );
+              }
+              state.currentSceneResources.delete(res.id);
+              sync3DScene();
+              renderAssets();
+              renderInspector();
+              menu.remove();
+              window.activeDropdown = null;
+            };
+          } else {
+            conv.textContent = "Сделать Internal";
+            conv.onclick = () => {
+              const nr = duplicateResource(res, owner.id);
+              if (nr) {
+                owner.refs[slotName] = nr.id;
+                sync3DScene();
+                renderInspector();
+              }
+              menu.remove();
+              window.activeDropdown = null;
+            };
+          }
+          menu.appendChild(conv);
+          if (
+            ctx &&
+            ctx.overrides &&
+            ctx.overrides[owner.id] &&
+            ctx.overrides[owner.id][slotName] !== undefined
+          ) {
+            const reset = document.createElement("div");
+            reset.className = "dropdown-item";
+            reset.style.color = "#ff9800";
+            reset.textContent = "Сбросить к оригиналу";
+            reset.onclick = () => {
+              delete ctx.overrides[owner.id][slotName];
+              sync3DScene();
+              renderInspector();
+              menu.remove();
+              window.activeDropdown = null;
+            };
+            menu.appendChild(reset);
+          }
+          const clear = document.createElement("div");
+          clear.className = "dropdown-item";
+          clear.style.color = "#ff8888";
+          clear.textContent = "Отвязать";
+          clear.onclick = () => {
+            if (ctx && ctx.overrides && ctx.overrides[owner.id]) {
+              delete ctx.overrides[owner.id][slotName];
+              sync3DScene();
+              renderInspector();
+            } else {
+              delete owner.refs[slotName];
+              sync3DScene();
+              renderInspector();
+            }
+            menu.remove();
+            window.activeDropdown = null;
+          };
+          menu.appendChild(clear);
+        }
+        menu.style.left = Math.min(rect.left, window.innerWidth - 220) + "px";
+        menu.style.top = rect.bottom + 2 + "px";
+        document.body.appendChild(menu);
+        window.activeDropdown = menu;
+        setTimeout(
+          () =>
+            document.addEventListener("click", function close(ev) {
+              if (!menu.contains(ev.target)) {
+                menu.remove();
+                window.activeDropdown = null;
+                document.removeEventListener("click", close);
+              }
+            }),
+          0,
+        );
+      };
+      function showResourcePicker(
+        rect,
+        owner,
+        slotName,
+        allowedTypes,
+        contextNode,
+      ) {
+        if (window.activeDropdown) window.activeDropdown.remove();
+        const menu = document.createElement("div");
+        menu.className = "res-dropdown";
+
+        // Куда записать ссылку: в override (если owner внешний) или в refs (если внутренний)
+        const bindNew = (resId) => {
+          if (contextNode && isAssetVisible(owner)) {
+            if (!contextNode.overrides) contextNode.overrides = {};
+            if (!contextNode.overrides[owner.id])
+              contextNode.overrides[owner.id] = {};
+            contextNode.overrides[owner.id][slotName] = resId;
+          } else {
+            owner.refs[slotName] = resId;
+          }
+          state.currentSceneResources.add(resId);
+          sync3DScene();
+          renderInspector();
+          renderAssets();
+          menu.remove();
+          window.activeDropdown = null;
+        };
+
+        // === 1. СУЩЕСТВУЮЩИЕ ИЗ ASSETS ===
+        const matching = allRes().filter(
+          (r) => isAssetVisible(r) && allowedTypes.includes(r.type),
+        );
+        if (matching.length) {
+          const h = document.createElement("div");
+          h.className = "dropdown-header";
+          h.textContent = "Из Assets";
+          menu.appendChild(h);
+          for (const r of matching) {
+            const item = document.createElement("div");
+            item.className = "dropdown-item";
+            item.innerHTML = `<span>${RES_ICON[r.type]}</span> ${r.name}`;
+            item.onclick = () => {
+              if (contextNode && isAssetVisible(owner)) {
+                if (!contextNode.overrides) contextNode.overrides = {};
+                if (!contextNode.overrides[owner.id])
+                  contextNode.overrides[owner.id] = {};
+                contextNode.overrides[owner.id][slotName] = r.id;
+              } else {
+                owner.refs[slotName] = r.id;
+              }
+              sync3DScene();
+              renderInspector();
+              menu.remove();
+              window.activeDropdown = null;
+            };
+            menu.appendChild(item);
+          }
+        }
+
+        // === 2. СОЗДАТЬ НОВЫЙ (встроенный в текущую сцену) ===
+        const h2 = document.createElement("div");
+        h2.className = "dropdown-header";
+        h2.textContent = "Создать новый (встроенный)";
+        menu.appendChild(h2);
+
+        if (allowedTypes.includes("mesh")) {
+          ["BoxMesh", "SphereMesh", "PlaneMesh"].forEach((t) => {
+            const item = document.createElement("div");
+            item.className = "dropdown-item";
+            item.textContent = "New " + t;
+            item.onclick = () => {
+              const geo =
+                t === "BoxMesh"
+                  ? new THREE.BoxGeometry(1, 1, 1)
+                  : t === "SphereMesh"
+                    ? new THREE.SphereGeometry(0.5, 32, 16)
+                    : new THREE.PlaneGeometry(1, 1);
+              const newRes = addRes(
+                new Resource("mesh", t + "_" + (RES_ID + 1), geo),
+              );
+              geo.userData.resource = newRes;
+              // Сразу создадим материал по умолчанию, чтобы меш не был голым
+              const defMat = new THREE.MeshStandardMaterial({
+                color: 0xcccccc,
+                roughness: 0.5,
+              });
+              const matRes = addRes(
+                new Resource("material", "Material_" + (RES_ID + 1), defMat),
+              );
+              defMat.userData.resource = matRes;
+              newRes.refs.material = matRes.id;
+              state.currentSceneResources.add(matRes.id);
+              bindNew(newRes.id);
+            };
+            menu.appendChild(item);
+          });
+        }
+
+        if (allowedTypes.includes("material")) {
+          const item = document.createElement("div");
+          item.className = "dropdown-item";
+          item.textContent = "New StandardMaterial3D";
+          item.onclick = () => {
+            const mat = new THREE.MeshStandardMaterial({
+              color: 0xcccccc,
+              roughness: 0.5,
+              metalness: 0.1,
+            });
+            const newRes = addRes(
+              new Resource("material", "Material_" + (RES_ID + 1), mat),
+            );
+            mat.userData.resource = newRes;
+            bindNew(newRes.id);
+          };
+          menu.appendChild(item);
+        }
+
+        if (allowedTypes.includes("texture")) {
+          const item = document.createElement("div");
+          item.className = "dropdown-item";
+          item.textContent = "New Texture (Empty)";
+          item.onclick = () => {
+            const c = document.createElement("canvas");
+            c.width = c.height = 128;
+            const ctx = c.getContext("2d");
+            for (let yy = 0; yy < 128; yy += 16)
+              for (let xx = 0; xx < 128; xx += 16) {
+                ctx.fillStyle = ((xx + yy) / 16) % 2 === 0 ? "#ccc" : "#888";
+                ctx.fillRect(xx, yy, 16, 16);
+              }
+            const tex = new THREE.CanvasTexture(c);
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
+            tex.needsUpdate = true;
+            const newRes = addRes(
+              new Resource("texture", "Texture_" + (RES_ID + 1), tex),
+            );
+            tex.userData.resource = newRes;
+            bindNew(newRes.id);
+          };
+          menu.appendChild(item);
+        }
+
+        if (allowedTypes.includes("animation")) {
+          const item = document.createElement("div");
+          item.className = "dropdown-item";
+          item.textContent = "New Animation";
+          item.onclick = () => {
+            const newRes = addRes(
+              new Resource("animation", "Anim_" + (RES_ID + 1), null, {
+                clips: [],
+              }),
+            );
+            bindNew(newRes.id);
+          };
+          menu.appendChild(item);
+        }
+
+        // === 3. ИМПОРТ ===
+        const h3 = document.createElement("div");
+        h3.className = "dropdown-header";
+        h3.textContent = "Импорт";
+        menu.appendChild(h3);
+        const imp = document.createElement("div");
+        imp.className = "dropdown-item";
+        imp.textContent = "📂 Импорт файла...";
+        imp.onclick = () => {
+          document.getElementById("file-input").click();
+          menu.remove();
+          window.activeDropdown = null;
+        };
+        menu.appendChild(imp);
+
+        menu.style.left = Math.min(rect.left, window.innerWidth - 240) + "px";
+        menu.style.top = rect.bottom + 2 + "px";
+        menu.style.minWidth = Math.max(rect.width, 240) + "px";
+        document.body.appendChild(menu);
+        window.activeDropdown = menu;
+        setTimeout(() => {
+          document.addEventListener("click", function close(ev) {
+            if (!menu.contains(ev.target)) {
+              menu.remove();
+              window.activeDropdown = null;
+              document.removeEventListener("click", close);
+            }
+          });
+        }, 0);
+      }
+      function duplicateResource(res, ownerId) {
+        let newRes;
+        if (res.type === "mesh") {
+          newRes = new Resource("mesh", res.name + "_Copy", res.data.clone());
+          if (res.refs.material) newRes.refs.material = res.refs.material;
+        } else if (res.type === "material") {
+          const m = res.data.clone();
+          m.needsUpdate = true;
+          newRes = new Resource("material", res.name + "_Copy", m);
+          for (const [s, t] of Object.entries(res.refs)) newRes.refs[s] = t;
+        } else if (res.type === "texture") {
+          const t = res.data.clone();
+          t.needsUpdate = true;
+          newRes = new Resource("texture", res.name + "_Copy", t);
+        } else if (res.type === "animation") {
+          newRes = new Resource("animation", res.name + "_Copy", null, {
+            clips: [...res.clips],
+          });
+        } else if (res.type === "animation_clip") {
+          newRes = new Resource(
+            "animation_clip",
+            res.name + "_Copy",
+            res.data.clone(),
+          );
+        }
+        if (newRes) {
+          addRes(newRes);
+          state.currentSceneResources.add(newRes.id);
+          if (ownerId) {
+            const prefabId = getOwningPrefabId(
+              getRes(ownerId) || findNode(ownerId),
+            );
+            if (prefabId) {
+              const p = getRes(prefabId);
+              if (p?.internalResources && !p.internalResources.includes(newRes))
+                p.internalResources.push(newRes);
+            }
+          }
+        }
+        return newRes;
+      }
+      function bindInspectorEvents() {
+        const body = document.getElementById("inspector-body");
+        body.querySelectorAll("[data-mat-prop]").forEach((inp) => {
+          inp.oninput = () => {
+            const r = getRes(inp.dataset.matId);
+            if (!r) return;
+            const p = inp.dataset.matProp;
+            let v;
+            if (inp.type === "color") {
+              v = inp.value;
+              if (!r.data[p]) r.data[p] = new THREE.Color();
+              r.data[p].set(v);
+            } else if (inp.type === "range") {
+              v = parseFloat(inp.value);
+              r.data[p] = v;
+              const el = inp.parentElement.querySelector(".val");
+              if (el) el.textContent = v.toFixed(2);
+            }
+            const contextNode = state.selectedNode;
+            if (contextNode && isAssetVisible(r)) {
+              if (!contextNode.overrides) contextNode.overrides = {};
+              if (!contextNode.overrides[r.id])
+                contextNode.overrides[r.id] = {};
+              contextNode.overrides[r.id][p] = v;
+              sync3DScene();
+            } else {
+              r.data.needsUpdate = true;
+              sync3DScene();
+            }
+          };
+          inp.onchange = () => {
+            if (state.selectedNode) renderInspector();
+          };
+        });
+        body.querySelectorAll("[data-node-prop]").forEach((inp) => {
+          inp.oninput = () => {
+            const n = findNode(inp.dataset.nodeId);
+            if (!n) return;
+            let v = parseFloat(inp.value) || 0;
+            if (inp.dataset.nodeProp === "rotation") v *= Math.PI / 180;
+            n.object3d[inp.dataset.nodeProp][inp.dataset.axis] = v;
+            n.object3d.updateMatrixWorld(true);
+          };
+        });
+        body.querySelectorAll("[data-tex-id]").forEach((inp) => {
+          const texRes = getRes(inp.dataset.texId);
+          if (!texRes) return;
+          const tex = texRes.data;
+          const forceUpdate = () => {
+            tex.needsUpdate = true;
+            tex.matrixAutoUpdate = true;
+            world.traverse((o) => {
+              if (o.isMesh && o.material) {
+                const ms = Array.isArray(o.material)
+                  ? o.material
+                  : [o.material];
+                for (const m of ms)
+                  if (
+                    m.map === tex ||
+                    m.normalMap === tex ||
+                    m.emissiveMap === tex ||
+                    m.roughnessMap === tex ||
+                    m.metalnessMap === tex
+                  )
+                    m.needsUpdate = true;
+              }
+            });
+          };
+          inp.oninput = () => {
+            const p = inp.dataset.texProp;
+            if (
+              p === "minFilter" ||
+              p === "magFilter" ||
+              p === "wrapS" ||
+              p === "wrapT"
+            )
+              tex[p] = parseInt(inp.value);
+            else if (p === "repeatX") {
+              tex.repeat.x = parseFloat(inp.value);
+              if (tex.wrapS !== THREE.RepeatWrapping)
+                tex.wrapS = THREE.RepeatWrapping;
+            } else if (p === "repeatY") {
+              tex.repeat.y = parseFloat(inp.value);
+              if (tex.wrapT !== THREE.RepeatWrapping)
+                tex.wrapT = THREE.RepeatWrapping;
+            } else if (p === "offsetX") tex.offset.x = parseFloat(inp.value);
+            else if (p === "offsetY") tex.offset.y = parseFloat(inp.value);
+            else if (p === "rotationDeg")
+              tex.rotation = (parseFloat(inp.value) * Math.PI) / 180;
+            else if (p === "flipY") tex.flipY = inp.checked;
+            forceUpdate();
+          };
+          inp.onchange = () => renderInspector();
+        });
+        const animSelect = document.getElementById("mixer-anim-select");
+        if (animSelect) {
+          animSelect.onchange = () => {
+            const node = state.selectedNode;
+            if (!node || node.type !== "AnimationMixer") return;
+            node.currentAnimIndex = parseInt(animSelect.value);
+            rebuildMixerActions(node);
+            renderInspector();
+            if (node.refs.animation) {
+              state.currentAnimResource = getRes(node.refs.animation);
+              state.currentAnimClipId =
+                state.currentAnimResource.clips[node.currentAnimIndex];
+              renderAnimationEditor();
+            }
+          };
+        }
+        const playingCheckbox = document.getElementById(
+          "mixer-playing-checkbox",
+        );
+        if (playingCheckbox)
+          playingCheckbox.onchange = () => {
+            const node = state.selectedNode;
+            if (!node || node.type !== "AnimationMixer") return;
+            node.isPlaying = playingCheckbox.checked;
+            if (node.currentAction) node.currentAction.paused = !node.isPlaying;
+            state.animIsPlaying = node.isPlaying;
+            renderAnimationEditor();
+          };
+        const loopCheckbox = document.getElementById("mixer-loop-checkbox");
+        if (loopCheckbox)
+          loopCheckbox.onchange = () => {
+            const node = state.selectedNode;
+            if (!node || node.type !== "AnimationMixer") return;
+            node.loop = loopCheckbox.checked;
+            if (node.currentAction)
+              node.currentAction.setLoop(
+                node.loop ? THREE.LoopRepeat : THREE.LoopOnce,
+                Infinity,
+              );
+          };
+        const speedInput = document.getElementById("mixer-speed-input");
+        if (speedInput)
+          speedInput.oninput = () => {
+            const node = state.selectedNode;
+            if (!node || node.type !== "AnimationMixer") return;
+            node.timeScale = parseFloat(speedInput.value) || 1;
+            if (node.currentAction)
+              node.currentAction.timeScale = node.timeScale;
+          };
+        body.querySelectorAll(".prop-slot").forEach((slotEl) => {
+          const types = slotEl.dataset.types
+            ? slotEl.dataset.types.split(",")
+            : [];
+          slotEl.ondragover = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (currentDragType && types.includes(currentDragType)) {
+              e.dataTransfer.dropEffect = "copy";
+              slotEl.classList.add("drag-valid");
+              slotEl.classList.remove("drag-invalid");
+            } else {
+              e.dataTransfer.dropEffect = "none";
+              slotEl.classList.add("drag-invalid");
+              slotEl.classList.remove("drag-valid");
+            }
+          };
+          slotEl.ondragleave = (e) => {
+            e.stopPropagation();
+            slotEl.classList.remove("drag-valid", "drag-invalid");
+          };
+          slotEl.ondrop = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            slotEl.classList.remove("drag-valid", "drag-invalid");
+            const resId = e.dataTransfer.getData("text/plain");
+            const res = getRes(resId);
+            if (!res) return;
+            if (types.includes(res.type)) {
+              const owner =
+                getRes(slotEl.dataset.ownerId) ||
+                findNode(slotEl.dataset.ownerId);
+              const ctx = slotEl.dataset.ctx
+                ? findNode(slotEl.dataset.ctx)
+                : null;
+              const slot = slotEl.dataset.slot;
+              if (ctx && isAssetVisible(owner)) {
+                if (!ctx.overrides) ctx.overrides = {};
+                if (!ctx.overrides[owner.id]) ctx.overrides[owner.id] = {};
+                ctx.overrides[owner.id][slot] = res.id;
+              } else {
+                owner.refs[slot] = res.id;
+              }
+              sync3DScene();
+              renderInspector();
+            }
+          };
+        });
+      }
+      function cleanupMixers(node) {
+        if (node.type === "AnimationMixer" && node.mixer) {
+          const idx = activeMixers.indexOf(node.mixer);
+          if (idx !== -1) activeMixers.splice(idx, 1);
+          node.mixer.stopAllAction();
+        }
+        for (const c of node.children) cleanupMixers(c);
+      }
+      window.deleteNode = function (id) {
+        const node = findNode(id);
+        if (!node) return;
+        cleanupMixers(node);
+        if (node.object3d && node.object3d.parent)
+          node.object3d.parent.remove(node.object3d);
+        const removeFromParent = (parent, target) => {
+          parent.children = parent.children.filter((c) => c !== target);
+          for (const c of parent.children) removeFromParent(c, target);
+        };
+        removeFromParent(state.sceneRoot, node);
+        rebuildTree();
+        state.selectedNode = null;
+        renderInspector();
+        setStatus(`Узел "${node.name}" удалён`);
+      };
+      window.selectBone = function (name) {
+        const n = state.selectedNode;
+        if (!n || !n.bones) return;
+        state.selectedBone = n.bones.find((b) => b.name === name);
+        renderInspector();
+      };
+      window.moveBone = function (name, prop, axis, val) {
+        const n = state.selectedNode;
+        if (!n || !n.bones) return;
+        const b = n.bones.find((x) => x.name === name);
+        if (!b) return;
+        let v = parseFloat(val) || 0;
+        if (prop === "rotation") v *= Math.PI / 180;
+        b[prop][axis] = v;
+        b.updateMatrixWorld(true);
+      };
+
+      /* ============ GLTF LOADER ============ */
+      const loader = new GLTFLoader();
+      function loadGLB(f) {
+        const r = new FileReader();
+        r.onload = (e) => {
+          loader.parse(
+            e.target.result,
+            "",
+            (g) => onModelLoaded(g, f.name),
+            (err) => {
+              console.error(err);
+              setStatus("Ошибка GLB");
+            },
+          );
+        };
+        r.readAsArrayBuffer(f);
+      }
+      function loadGLTFMulti(files) {
+        const g = files.find((f) => /\.gltf$/i.test(f.name));
+        if (!g) return setStatus("Нет .gltf");
+        const map = new Map();
+        for (const f of files) map.set(f.name, URL.createObjectURL(f));
+        const mgr = new THREE.LoadingManager();
+        mgr.setURLModifier(
+          (u) => map.get(u.split("/").pop().split("?")[0]) || u,
+        );
+        new GLTFLoader(mgr).load(
+          map.get(g.name),
+          (gl) => onModelLoaded(gl, g.name),
+          undefined,
+          (e) => {
+            console.error(e);
+            setStatus("Ошибка gltf");
+          },
+        );
+      }
+
+      function onModelLoaded(gltf, filename) {
+        const prefabName = filename.replace(/\.(glb|gltf)$/i, "");
+        const prefabRes = addRes(
+          new Resource("prefab", prefabName, gltf.scene, { imported: true }),
+        );
+        prefabRes.internalNodes = [];
+        prefabRes.internalResources = [];
+        const seenGeos = new Map();
+        const seenMats = new Map();
+        const usedMeshIds = new Set();
+
+        gltf.scene.traverse((o) => {
+          if (!o.isMesh && !o.isSkinnedMesh) return;
+          let meshRes = seenGeos.get(o.geometry.uuid);
+          if (!meshRes) {
+            meshRes = addRes(
+              new Resource(
+                "mesh",
+                (o.name || "Mesh") + "_ArrayMesh",
+                o.geometry,
+              ),
+            );
+            seenGeos.set(o.geometry.uuid, meshRes);
+            usedMeshIds.add(meshRes.id);
+            o.geometry.userData.resource = meshRes;
+          }
+          o.userData._meshResId = meshRes.id;
+
+          const mat = Array.isArray(o.material) ? o.material[0] : o.material;
+          if (mat) {
+            let matRes = seenMats.get(mat.uuid);
+            if (!matRes) {
+              matRes = addRes(
+                new Resource("material", mat.name || "Material", mat),
+              );
+              seenMats.set(mat.uuid, matRes);
+              meshRes.refs.material = matRes.id;
+              usedMeshIds.add(matRes.id);
+              mat.userData.resource = matRes;
+              for (const [threeSlot, ourSlot] of Object.entries({
+                map: "albedo",
+                normalMap: "normal",
+              })) {
+                const tex = mat[threeSlot];
+                if (tex?.isTexture) {
+                  let texRes = tex.userData.resource;
+                  if (!texRes) {
+                    texRes = addRes(
+                      new Resource("texture", `${mat.name}_${ourSlot}`, tex, {
+                        imported: true,
+                      }),
+                    );
+                    tex.userData.resource = texRes;
+                  }
+                  matRes.refs[ourSlot] = texRes.id;
+                  usedMeshIds.add(texRes.id);
+                }
+              }
+            }
+          }
+        });
+
+        for (const rId of usedMeshIds) {
+          const r = getRes(rId);
+          if (r) prefabRes.internalResources.push(r);
+        }
+
+        const animClips = [];
+        for (const clip of gltf.animations || []) {
+          const clipRes = addRes(
+            new Resource("animation_clip", clip.name || "clip", clip),
+          );
+          animClips.push(clipRes.id);
+          prefabRes.internalResources.push(clipRes);
+        }
+        let animRes = null;
+        if (animClips.length > 0) {
+          animRes = addRes(
+            new Resource("animation", `${prefabName}_Anim`, null, {
+              clips: animClips,
+            }),
+          );
+          prefabRes.internalResources.push(animRes);
+        }
+
+        // internalNodes (все объекты кроме костей)
+        (function walk(obj) {
+          if (obj.isBone) return;
+          const type = classifyObject(obj);
+          prefabRes.internalNodes.push({
+            id: "n" + ++NODE_ID,
+            type,
+            name: obj.name || type,
+            object3d: obj,
+            parent: null,
+            children: [],
+            refs: {},
+          });
+          for (const c of obj.children) walk(c);
+        })(gltf.scene);
+
+        if (animRes) {
+          prefabRes.internalNodes.push({
+            id: "n" + ++NODE_ID,
+            type: "AnimationMixer",
+            name: "AnimationMixer",
+            object3d: null,
+            parent: null,
+            children: [],
+            refs: { animation: animRes.id },
+            currentAnimIndex: 0,
+            isPlaying: true,
+            timeScale: 1.0,
+            loop: true,
+            mixer: null,
+            virtual: true,
+          });
+        }
+
+        renderAssets();
+        renderInspector();
+        sync3DScene();
+        setStatus(
+          `✅ Импорт: Префаб «${prefabName}» (${prefabRes.internalNodes.length} узлов, ${prefabRes.internalResources.length} ресурсов)`,
+        );
+      }
+
+      function setStatus(t) {
+        document.getElementById("status").textContent = t;
+      }
+      document.getElementById("file-input").onchange = (e) => {
+        handleFiles(e.target.files);
+        e.target.value = "";
+      };
+
+      function handleFiles(files) {
+        const arr = Array.from(files);
+        const glb = arr.find((f) => /\.glb$/i.test(f.name));
+        const gltf = arr.find((f) => /\.gltf$/i.test(f.name));
+        if (glb) return loadGLB(glb);
+        if (gltf) return loadGLTFMulti(arr);
+        for (const f of arr) {
+          if (!f.type.startsWith("image/")) continue;
+          const url = URL.createObjectURL(f);
+          const img = new Image();
+          img.onload = () => {
+            const tex = new THREE.Texture(img);
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
+            tex.needsUpdate = true;
+            const r = addRes(
+              new Resource("texture", f.name, tex, { imported: true }),
+            );
+            tex.userData.resource = r;
+            renderAssets();
+            setStatus(`Текстура «${f.name}» добавлена`);
+          };
+          img.src = url;
+        }
+      }
+
+      document.addEventListener("dragover", (e) => e.preventDefault());
+      document.addEventListener("drop", (e) => {
+        e.preventDefault();
+        document.getElementById("drop-zone").classList.remove("dragover");
+        const internalResId = e.dataTransfer.getData("text/plain");
+        if (internalResId && library.has(internalResId)) return;
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0)
+          handleFiles(e.dataTransfer.files);
+      });
+      const dz = document.getElementById("drop-zone");
+      dz.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dz.classList.add("dragover");
+      });
+      dz.addEventListener("dragleave", () => dz.classList.remove("dragover"));
+
+      const clock = new THREE.Clock();
+      function tick() {
+        requestAnimationFrame(tick);
+        const dt = clock.getDelta();
+        for (const mixer of activeMixers) mixer.update(dt);
+        world.traverse((o) => {
+          if (o.userData.billboard) o.quaternion.copy(camera.quaternion);
+        });
+        controls.update();
+        renderer.render(scene, camera);
+        const mixerNode = findActiveMixerNode();
+        if (mixerNode && mixerNode.currentAction) {
+          if (state.animIsPlaying) {
+            state.animCurrentTime = mixerNode.currentAction.time;
+            if (
+              !mixerNode.loop &&
+              state.animCurrentTime >=
+                mixerNode.currentAction.getClip().duration
+            ) {
+              state.animIsPlaying = false;
+              const playBtn = document.getElementById("anim-play-btn");
+              if (playBtn) playBtn.textContent = "▶";
+            }
+            updateAnimPlayhead();
+          }
+        }
+      }
+      tick();
+      renderSceneTree();
+      renderAssets();
+      renderInspector();
+    </script>
+  </body>
+</html>

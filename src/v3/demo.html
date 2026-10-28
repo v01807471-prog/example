@@ -1,0 +1,2046 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ECS 3D Editor</title>
+    <style>
+      :root {
+        --bg: #0f1117;
+        --panel: #161a22;
+        --panel-2: #1c212b;
+        --line: #252c39;
+        --text: #c8d1e0;
+        --dim: #7a879d;
+        --accent: #5aa9ff;
+        --accent-2: #7cf0a8;
+        --danger: #ff6b6b;
+        --warn: #ffc857;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        font:
+          13px/1.45 ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          Consolas,
+          monospace;
+        background: var(--bg);
+        color: var(--text);
+        overflow: hidden;
+        user-select: none;
+      }
+      #app {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+      }
+
+      /* ---------- Toolbar ---------- */
+      #toolbar {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 10px;
+        background: linear-gradient(180deg, #1b2029, #141821);
+        border-bottom: 1px solid var(--line);
+        flex: 0 0 auto;
+      }
+      .brand {
+        font-weight: 700;
+        letter-spacing: 1px;
+        margin-right: 14px;
+        font-size: 14px;
+        color: #fff;
+      }
+      .brand span {
+        color: var(--accent);
+      }
+      .tb {
+        background: var(--panel-2);
+        border: 1px solid var(--line);
+        color: var(--text);
+        padding: 5px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        font: inherit;
+        font-size: 12px;
+        transition: 0.12s;
+      }
+      .tb:hover {
+        background: #232a36;
+        border-color: #33405a;
+        color: #fff;
+      }
+      .tb.active {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #04101f;
+        font-weight: 700;
+      }
+      .tb.play {
+        border-color: #2c6b45;
+        color: #8ef0b4;
+      }
+      .tb.play:hover {
+        background: #15321f;
+      }
+      .tb.stop {
+        border-color: #6b2c2c;
+        color: #ffa8a8;
+      }
+      .tb.stop:hover {
+        background: #321515;
+      }
+      .sep {
+        width: 1px;
+        height: 22px;
+        background: var(--line);
+        margin: 0 6px;
+      }
+      .fps {
+        margin-left: auto;
+        color: var(--dim);
+        font-size: 11px;
+      }
+
+      /* ---------- Layout ---------- */
+      main {
+        display: flex;
+        flex: 1 1 auto;
+        min-height: 0;
+      }
+      .panel {
+        background: var(--panel);
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+      #left {
+        width: 250px;
+        border-right: 1px solid var(--line);
+      }
+      #right {
+        width: 310px;
+        border-left: 1px solid var(--line);
+      }
+      .panel-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--line);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--dim);
+        background: var(--panel-2);
+        flex: 0 0 auto;
+      }
+      .panel-body {
+        overflow: auto;
+        flex: 1 1 auto;
+        padding: 6px;
+      }
+
+      /* ---------- Viewport ---------- */
+      #viewport {
+        flex: 1 1 auto;
+        position: relative;
+        min-width: 0;
+        background: #0b0d12;
+        overflow: hidden;
+      }
+      #viewport canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      #viewport::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        box-shadow: inset 0 0 120px rgba(0, 0, 0, 0.65);
+      }
+      .badge {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        z-index: 5;
+        background: #2c6b45;
+        color: #d8ffe9;
+        padding: 3px 10px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        display: none;
+        animation: pulse 1.4s infinite;
+      }
+      .badge.on {
+        display: block;
+      }
+      @keyframes pulse {
+        50% {
+          opacity: 0.55;
+        }
+      }
+
+      /* ---------- Hierarchy ---------- */
+      .hrow {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 8px;
+        border-radius: 5px;
+        cursor: pointer;
+        white-space: nowrap;
+        overflow: hidden;
+      }
+      .hrow:hover {
+        background: #1e2531;
+      }
+      .hrow.sel {
+        background: #1d3a5c;
+        color: #fff;
+      }
+      .hrow .ico {
+        opacity: 0.85;
+        font-size: 11px;
+        width: 14px;
+        text-align: center;
+      }
+      .hrow .nm {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* ---------- Inspector ---------- */
+      .empty {
+        color: var(--dim);
+        padding: 20px 10px;
+        text-align: center;
+        font-size: 12px;
+      }
+      .ent-head {
+        display: flex;
+        gap: 6px;
+        padding: 4px 2px 10px;
+      }
+      .ent-name {
+        flex: 1;
+        background: var(--panel-2);
+        border: 1px solid var(--line);
+        color: #fff;
+        padding: 6px 8px;
+        border-radius: 5px;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .ent-name:focus {
+        outline: none;
+        border-color: var(--accent);
+      }
+      .comp {
+        background: var(--panel-2);
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        margin-bottom: 8px;
+        overflow: hidden;
+      }
+      .comp-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 6px 8px;
+        background: #212936;
+        border-bottom: 1px solid var(--line);
+      }
+      .comp-title {
+        font-weight: 700;
+        font-size: 11.5px;
+        letter-spacing: 0.6px;
+        color: #9fd0ff;
+      }
+      .comp-body {
+        padding: 8px;
+      }
+      .field {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+      .flabel {
+        width: 82px;
+        flex: 0 0 auto;
+        color: var(--dim);
+        font-size: 11px;
+        text-transform: capitalize;
+      }
+      .finput {
+        flex: 1;
+        min-width: 0;
+        background: #12161e;
+        border: 1px solid var(--line);
+        color: var(--text);
+        padding: 4px 6px;
+        border-radius: 4px;
+        font: inherit;
+        font-size: 12px;
+      }
+      .finput:focus {
+        outline: none;
+        border-color: var(--accent);
+      }
+      input[type="color"].finput {
+        padding: 1px;
+        height: 24px;
+        cursor: pointer;
+      }
+      select.finput {
+        cursor: pointer;
+      }
+      textarea.finput {
+        resize: vertical;
+        min-height: 110px;
+        font-size: 11.5px;
+        line-height: 1.5;
+      }
+      .vec3 {
+        display: flex;
+        gap: 4px;
+        flex: 1;
+        min-width: 0;
+      }
+      .vec3 .finput {
+        width: 100%;
+      }
+      .axis-label {
+        font-size: 10px;
+        font-weight: 700;
+        width: 10px;
+        text-align: center;
+      }
+      .axis-label.x {
+        color: #ff7b7b;
+      }
+      .axis-label.y {
+        color: #7bff9c;
+      }
+      .axis-label.z {
+        color: #7bb4ff;
+      }
+      .mini {
+        background: #2a3241;
+        border: 1px solid var(--line);
+        color: var(--text);
+        width: 22px;
+        height: 22px;
+        border-radius: 4px;
+        cursor: pointer;
+        font: inherit;
+        line-height: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+      }
+      .mini:hover {
+        background: #37425a;
+        color: #fff;
+      }
+      .mini.danger:hover {
+        background: #5a2020;
+        border-color: #7a2c2c;
+        color: #fff;
+      }
+      .add-comp select {
+        width: 100%;
+        background: var(--panel-2);
+        border: 1px dashed #33405a;
+        color: var(--dim);
+        padding: 7px;
+        border-radius: 6px;
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      .add-comp select:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      /* ---------- Console ---------- */
+      #console {
+        flex: 0 0 118px;
+        background: #0b0e13;
+        border-top: 1px solid var(--line);
+        overflow: auto;
+        padding: 4px 10px;
+        font-size: 11.5px;
+      }
+      .log-line {
+        padding: 1px 0;
+        color: #8b98ad;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .log-line.err {
+        color: var(--danger);
+      }
+      .log-line.sys {
+        color: var(--accent-2);
+      }
+      #console::-webkit-scrollbar,
+      #hierarchy::-webkit-scrollbar,
+      #inspector::-webkit-scrollbar {
+        width: 9px;
+      }
+      #console::-webkit-scrollbar-thumb,
+      #hierarchy::-webkit-scrollbar-thumb,
+      #inspector::-webkit-scrollbar-thumb {
+        background: #2a3241;
+        border-radius: 5px;
+      }
+      #console::-webkit-scrollbar-track,
+      #hierarchy::-webkit-scrollbar-track,
+      #inspector::-webkit-scrollbar-track {
+        background: transparent;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <header id="toolbar">
+        <div class="brand">ECS<span>3D</span></div>
+        <button id="btn-play" class="tb play">▶ Играть</button>
+        <button id="btn-stop" class="tb stop">⏹ Стоп</button>
+        <div class="sep"></div>
+        <button class="tb mode-btn active" data-mode="translate">
+          Перемещение
+        </button>
+        <button class="tb mode-btn" data-mode="rotate">Вращение</button>
+        <button class="tb mode-btn" data-mode="scale">Масштаб</button>
+        <div class="sep"></div>
+        <button id="btn-save" class="tb">💾 Сохранить</button>
+        <button id="btn-load" class="tb">📂 Загрузить</button>
+        <button id="btn-export" class="tb">⬇ Экспорт</button>
+        <button id="btn-import" class="tb">⬆ Импорт</button>
+        <input
+          type="file"
+          id="file-input"
+          accept=".json,application/json"
+          hidden
+        />
+        <span id="fps" class="fps">—</span>
+      </header>
+
+      <main>
+        <aside id="left" class="panel">
+          <div class="panel-head">
+            <span>Иерархия</span>
+            <select
+              id="add-select"
+              class="mini"
+              style="width: auto; padding: 0 4px; font-size: 11px"
+            >
+              <option value="">+ Объект</option>
+              <option value="empty">Пустой</option>
+              <option value="cube">Куб</option>
+              <option value="sphere">Сфера</option>
+              <option value="cylinder">Цилиндр</option>
+              <option value="cone">Конус</option>
+              <option value="torus">Тор</option>
+              <option value="capsule">Капсула</option>
+              <option value="plane">Плоскость</option>
+              <option value="light">Свет</option>
+              <option value="camera">Камера</option>
+            </select>
+          </div>
+          <div id="hierarchy" class="panel-body"></div>
+        </aside>
+
+        <div id="viewport">
+          <div class="badge" id="play-badge">● PLAY</div>
+        </div>
+
+        <aside id="right" class="panel">
+          <div class="panel-head"><span>Инспектор</span></div>
+          <div id="inspector" class="panel-body"></div>
+        </aside>
+      </main>
+
+      <footer id="console"></footer>
+    </div>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+
+    <script type="module">
+      import * as THREE from "three";
+      import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+      import { TransformControls } from "three/addons/controls/TransformControls.js";
+
+      /* =========================================================================
+   0. УТИЛИТЫ
+   ========================================================================= */
+      const $ = (s, r = document) => r.querySelector(s);
+
+      function el(tag, props = {}, ...children) {
+        const n = document.createElement(tag);
+        for (const [k, v] of Object.entries(props)) {
+          if (v === undefined || v === null) continue;
+          if (k === "class") n.className = v;
+          else if (k === "style" && typeof v === "object")
+            Object.assign(n.style, v);
+          else if (k.startsWith("on"))
+            n.addEventListener(k.slice(2).toLowerCase(), v);
+          else if (k === "dataset") Object.assign(n.dataset, v);
+          else if (k in n) {
+            try {
+              n[k] = v;
+            } catch {
+              n.setAttribute(k, v);
+            }
+          } else n.setAttribute(k, v);
+        }
+        for (const c of children.flat()) {
+          if (c === null || c === undefined || c === false) continue;
+          n.append(c.nodeType ? c : document.createTextNode(String(c)));
+        }
+        return n;
+      }
+
+      const consoleEl = $("#console");
+      function logLine(msg, cls = "") {
+        const line = el("div", { class: "log-line " + cls }, msg);
+        consoleEl.append(line);
+        while (consoleEl.childElementCount > 300) consoleEl.firstChild.remove();
+        consoleEl.scrollTop = consoleEl.scrollHeight;
+      }
+      function logSys(m) {
+        logLine("» " + m, "sys");
+      }
+      function logErr(m) {
+        logLine("✖ " + m, "err");
+        console.error(m);
+      }
+
+      /* =========================================================================
+   1. THREE.JS: РЕНДЕР, СЦЕНА, КАМЕРА РЕДАКТОРА
+   ========================================================================= */
+      const viewport = $("#viewport");
+
+      const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        powerPreference: "high-performance",
+      });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.05;
+      viewport.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0f1117);
+      scene.fog = new THREE.Fog(0x0f1117, 55, 170);
+
+      const editorCam = new THREE.PerspectiveCamera(60, 1, 0.1, 3000);
+      editorCam.position.set(9, 7, 13);
+
+      const orbit = new OrbitControls(editorCam, renderer.domElement);
+      orbit.target.set(0, 1, 0);
+      orbit.enableDamping = true;
+      orbit.dampingFactor = 0.08;
+
+      // Сетка и оси (не участвуют в пикинге — лежат вне world.container)
+      const grid = new THREE.GridHelper(80, 80, 0x3a4358, 0x1c222d);
+      grid.material.transparent = true;
+      grid.material.opacity = 0.65;
+      scene.add(grid);
+      scene.add(new THREE.AxesHelper(2));
+
+      // Гизмо
+      const transformControls = new TransformControls(
+        editorCam,
+        renderer.domElement,
+      );
+      transformControls.setSize(0.9);
+      transformControls.addEventListener("dragging-changed", (e) => {
+        orbit.enabled = !e.value;
+      });
+      scene.add(transformControls);
+
+      /* =========================================================================
+   2. ЯДРО ECS
+   ========================================================================= */
+
+      /** Реестр всех зарегистрированных типов компонентов */
+      const Components = new Map();
+
+      /**
+       * Регистрация компонента.
+       * def = {
+       *   schema: { field: {type, default, min, max, step, options, label} },
+       *   phase: 'sync' | 'behavior',   // sync — применяется к three.js каждый кадр
+       *                                 // behavior — логика, работает только в Play
+       *   behaviorOnly: bool,           // не выполнять вне Play-режима
+       *   create(e, data, world),       // создан
+       *   update(e, data, dt, world),   // каждый кадр
+       *   start(e, data, world),        // старт Play
+       *   destroy(e, data, world),      // удалён
+       *   onEdit(e, data, world)        // изменён в инспекторе
+       * }
+       */
+      function defineComponent(name, def) {
+        Components.set(
+          name,
+          Object.assign(
+            {
+              name,
+              schema: {},
+              phase: "sync",
+              behaviorOnly: false,
+            },
+            def,
+          ),
+        );
+      }
+
+      function defaultForType(field) {
+        if (field.default !== undefined) return structuredClone(field.default);
+        switch (field.type) {
+          case "number":
+            return 0;
+          case "boolean":
+            return false;
+          case "string":
+            return "";
+          case "color":
+            return "#ffffff";
+          case "vec3":
+            return { x: 0, y: 0, z: 0 };
+          case "select":
+            return field.options ? field.options[0] : "";
+          case "entity":
+            return 0;
+          case "code":
+            return "";
+          default:
+            return null;
+        }
+      }
+
+      function defaultsFor(def) {
+        const o = {};
+        for (const [k, f] of Object.entries(def.schema))
+          o[k] = defaultForType(f);
+        return o;
+      }
+
+      /* -------------------------------------------------------------------------
+   Мир
+   ------------------------------------------------------------------------- */
+      let _eid = 0;
+
+      const world = {
+        entities: new Map(),
+        container: new THREE.Group(),
+        playing: false,
+        time: 0,
+      };
+      scene.add(world.container);
+
+      function createEntity(name = "Entity", forcedId = null) {
+        const e = {
+          id: forcedId !== null ? forcedId : ++_eid,
+          name,
+          components: new Map(),
+          group: new THREE.Group(),
+          rt: {}, // runtime-объекты (three.js) по типам компонентов
+        };
+        if (e.id > _eid) _eid = e.id;
+        e.group.name = name;
+        e.group.userData.entityId = e.id;
+        world.entities.set(e.id, e);
+        world.container.add(e.group);
+        return e;
+      }
+
+      function destroyEntity(e) {
+        for (const type of [...e.components.keys()]) removeComponent(e, type);
+        e.group.removeFromParent();
+        world.entities.delete(e.id);
+        if (selectedId === e.id) {
+          selectedId = null;
+          transformControls.detach();
+        }
+      }
+
+      function addComponent(e, type, data = {}) {
+        const def = Components.get(type);
+        if (!def) {
+          logErr(`Неизвестный компонент: ${type}`);
+          return null;
+        }
+        if (e.components.has(type)) return e.components.get(type);
+
+        const d = Object.assign(defaultsFor(def), structuredClone(data));
+        e.components.set(type, d);
+        try {
+          def.create?.(e, d, world);
+        } catch (err) {
+          logErr(`${type}.create: ${err.message}`);
+        }
+        return d;
+      }
+
+      function removeComponent(e, type) {
+        const def = Components.get(type);
+        const d = e.components.get(type);
+        if (!d) return;
+        try {
+          def?.destroy?.(e, d, world);
+        } catch (err) {
+          logErr(`${type}.destroy: ${err.message}`);
+        }
+        e.components.delete(type);
+        delete e.rt[type];
+      }
+
+      function getComponent(e, type) {
+        return e.components.get(type);
+      }
+
+      /* -------------------------------------------------------------------------
+   Обновление мира: две фазы — поведение, затем синхронизация с three.js
+   ------------------------------------------------------------------------- */
+      function updateWorld(dt) {
+        if (world.playing) world.time += dt;
+
+        for (const e of world.entities.values()) {
+          for (const [type, d] of e.components) {
+            const def = Components.get(type);
+            if (!def || def.phase !== "behavior") continue;
+            if (def.behaviorOnly && !world.playing) continue;
+            try {
+              def.update?.(e, d, dt, world);
+            } catch (err) {
+              logErr(`${type}.update [${e.name}]: ${err.message}`);
+            }
+          }
+        }
+
+        for (const e of world.entities.values()) {
+          for (const [type, d] of e.components) {
+            const def = Components.get(type);
+            if (!def || def.phase !== "sync") continue;
+            try {
+              def.update?.(e, d, dt, world);
+            } catch (err) {
+              logErr(`${type}.update [${e.name}]: ${err.message}`);
+            }
+          }
+        }
+      }
+
+      /* =========================================================================
+   3. КОМПОНЕНТЫ
+   ========================================================================= */
+
+      /* ---------------------------- Transform -------------------------------- */
+      defineComponent("Transform", {
+        phase: "sync",
+        schema: {
+          position: { type: "vec3", default: { x: 0, y: 0, z: 0 }, step: 0.1 },
+          rotation: { type: "vec3", default: { x: 0, y: 0, z: 0 }, step: 1 }, // градусы
+          scale: { type: "vec3", default: { x: 1, y: 1, z: 1 }, step: 0.1 },
+          parent: { type: "entity", default: 0 },
+          visible: { type: "boolean", default: true },
+        },
+        update(e, d, dt, w) {
+          const g = e.group;
+          const parentEntity = d.parent ? w.entities.get(d.parent) : null;
+          const target = parentEntity ? parentEntity.group : w.container;
+          if (g.parent !== target) target.add(g);
+
+          g.position.set(d.position.x, d.position.y, d.position.z);
+          g.rotation.set(
+            THREE.MathUtils.degToRad(d.rotation.x),
+            THREE.MathUtils.degToRad(d.rotation.y),
+            THREE.MathUtils.degToRad(d.rotation.z),
+          );
+          g.scale.set(
+            d.scale.x || 0.0001,
+            d.scale.y || 0.0001,
+            d.scale.z || 0.0001,
+          );
+          g.visible = !!d.visible;
+          g.name = e.name;
+        },
+      });
+
+      /* --------------------------- MeshRenderer ------------------------------ */
+      const GEO_CACHE = {};
+      function geometryFor(kind) {
+        if (GEO_CACHE[kind]) return GEO_CACHE[kind];
+        let g;
+        switch (kind) {
+          case "sphere":
+            g = new THREE.SphereGeometry(0.5, 32, 20);
+            break;
+          case "cylinder":
+            g = new THREE.CylinderGeometry(0.5, 0.5, 1, 32);
+            break;
+          case "cone":
+            g = new THREE.ConeGeometry(0.5, 1, 32);
+            break;
+          case "torus":
+            g = new THREE.TorusGeometry(0.4, 0.15, 16, 48);
+            break;
+          case "capsule":
+            g = new THREE.CapsuleGeometry(0.35, 0.4, 8, 20);
+            break;
+          case "plane":
+            g = new THREE.PlaneGeometry(1, 1, 1, 1);
+            break;
+          case "icosahedron":
+            g = new THREE.IcosahedronGeometry(0.5, 0);
+            break;
+          case "box":
+          default:
+            g = new THREE.BoxGeometry(1, 1, 1);
+        }
+        GEO_CACHE[kind] = g;
+        return g;
+      }
+
+      defineComponent("MeshRenderer", {
+        phase: "sync",
+        schema: {
+          geometry: {
+            type: "select",
+            options: [
+              "box",
+              "sphere",
+              "cylinder",
+              "cone",
+              "torus",
+              "capsule",
+              "plane",
+              "icosahedron",
+            ],
+            default: "box",
+          },
+          color: { type: "color", default: "#7aa2f7" },
+          metalness: {
+            type: "number",
+            default: 0.15,
+            min: 0,
+            max: 1,
+            step: 0.01,
+          },
+          roughness: {
+            type: "number",
+            default: 0.55,
+            min: 0,
+            max: 1,
+            step: 0.01,
+          },
+          opacity: { type: "number", default: 1, min: 0, max: 1, step: 0.01 },
+          wireframe: { type: "boolean", default: false },
+          castShadow: { type: "boolean", default: true },
+          receiveShadow: { type: "boolean", default: true },
+        },
+        create(e, d) {
+          const mat = new THREE.MeshStandardMaterial({ color: d.color });
+          const mesh = new THREE.Mesh(geometryFor(d.geometry), mat);
+          mesh.castShadow = d.castShadow;
+          mesh.receiveShadow = d.receiveShadow;
+          e.group.add(mesh);
+          e.rt.MeshRenderer = { mesh, geoName: d.geometry };
+        },
+        update(e, d) {
+          const rt = e.rt.MeshRenderer;
+          if (!rt) return;
+          if (rt.geoName !== d.geometry) {
+            rt.mesh.geometry = geometryFor(d.geometry);
+            rt.geoName = d.geometry;
+          }
+          const m = rt.mesh.material;
+          m.color.set(d.color);
+          m.metalness = d.metalness;
+          m.roughness = d.roughness;
+          m.opacity = d.opacity;
+          m.transparent = d.opacity < 1;
+          m.wireframe = d.wireframe;
+          rt.mesh.castShadow = d.castShadow;
+          rt.mesh.receiveShadow = d.receiveShadow;
+        },
+        destroy(e) {
+          const rt = e.rt.MeshRenderer;
+          if (!rt) return;
+          rt.mesh.removeFromParent();
+          rt.mesh.material.dispose();
+        },
+      });
+
+      /* ------------------------------- Light --------------------------------- */
+      defineComponent("Light", {
+        phase: "sync",
+        schema: {
+          type: {
+            type: "select",
+            options: ["directional", "point", "spot", "ambient", "hemisphere"],
+            default: "directional",
+          },
+          color: { type: "color", default: "#ffffff" },
+          intensity: { type: "number", default: 2.5, min: 0, step: 0.1 },
+          distance: { type: "number", default: 0, min: 0, step: 0.5 },
+          angle: {
+            type: "number",
+            default: 0.6,
+            min: 0.01,
+            max: 1.57,
+            step: 0.02,
+          },
+          castShadow: { type: "boolean", default: true },
+        },
+        create(e) {
+          e.rt.Light = { light: null, type: null };
+        },
+        update(e, d) {
+          const rt = e.rt.Light;
+          if (!rt) return;
+
+          if (rt.type !== d.type) {
+            if (rt.light) {
+              rt.light.target?.removeFromParent();
+              rt.light.removeFromParent();
+              rt.light.dispose?.();
+            }
+            let light;
+            switch (d.type) {
+              case "point":
+                light = new THREE.PointLight();
+                break;
+              case "spot":
+                light = new THREE.SpotLight();
+                break;
+              case "ambient":
+                light = new THREE.AmbientLight();
+                break;
+              case "hemisphere":
+                light = new THREE.HemisphereLight();
+                break;
+              default:
+                light = new THREE.DirectionalLight();
+            }
+            if (light.shadow) {
+              light.shadow.mapSize.set(1024, 1024);
+              light.shadow.bias = -0.0005;
+              if (light.shadow.camera.isOrthographicCamera) {
+                const c = light.shadow.camera;
+                c.left = -14;
+                c.right = 14;
+                c.top = 14;
+                c.bottom = -14;
+                c.near = 0.5;
+                c.far = 60;
+                c.updateProjectionMatrix();
+              }
+            }
+            // направление света — по локальной оси -Z сущности
+            if (light.target) {
+              light.target.position.set(0, 0, -1);
+              e.group.add(light.target);
+            }
+            e.group.add(light);
+            rt.light = light;
+            rt.type = d.type;
+          }
+
+          const l = rt.light;
+          l.color.set(d.color);
+          l.intensity = d.intensity;
+          l.castShadow = d.castShadow;
+          if ("distance" in l) l.distance = d.distance;
+          if ("angle" in l) l.angle = d.angle;
+        },
+        destroy(e) {
+          const rt = e.rt.Light;
+          if (!rt?.light) return;
+          rt.light.target?.removeFromParent();
+          rt.light.removeFromParent();
+          rt.light.dispose?.();
+        },
+      });
+
+      /* ------------------------------- Camera -------------------------------- */
+      defineComponent("Camera", {
+        phase: "sync",
+        schema: {
+          fov: { type: "number", default: 60, min: 1, max: 179, step: 1 },
+          near: { type: "number", default: 0.1, min: 0.001, step: 0.05 },
+          far: { type: "number", default: 1000, min: 1, step: 10 },
+          active: { type: "boolean", default: true },
+        },
+        create(e) {
+          const cam = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
+          e.group.add(cam);
+          e.rt.Camera = cam;
+        },
+        update(e, d) {
+          const cam = e.rt.Camera;
+          if (!cam) return;
+          cam.fov = d.fov;
+          cam.near = d.near;
+          cam.far = d.far;
+          cam.aspect =
+            viewport.clientWidth / Math.max(1, viewport.clientHeight);
+          cam.updateProjectionMatrix();
+        },
+        destroy(e) {
+          e.rt.Camera?.removeFromParent();
+        },
+      });
+
+      /* ------------------------------ Rotator -------------------------------- */
+      defineComponent("Rotator", {
+        phase: "behavior",
+        behaviorOnly: true,
+        schema: {
+          speed: { type: "vec3", default: { x: 0, y: 60, z: 0 }, step: 5 }, // град/сек
+        },
+        update(e, d, dt) {
+          const t = e.components.get("Transform");
+          if (!t) return;
+          t.rotation.x += d.speed.x * dt;
+          t.rotation.y += d.speed.y * dt;
+          t.rotation.z += d.speed.z * dt;
+        },
+      });
+
+      /* ------------------------------ RigidBody ------------------------------ */
+      defineComponent("RigidBody", {
+        phase: "behavior",
+        behaviorOnly: true,
+        schema: {
+          velocity: { type: "vec3", default: { x: 0, y: 0, z: 0 }, step: 0.1 },
+          gravity: { type: "number", default: -18, step: 0.5 },
+          bounce: { type: "number", default: 0.55, min: 0, max: 1, step: 0.05 },
+          radius: { type: "number", default: 0.5, min: 0.01, step: 0.05 },
+          useGround: { type: "boolean", default: true },
+          groundY: { type: "number", default: 0, step: 0.1 },
+          bounds: { type: "number", default: 20, min: 1, step: 1 },
+        },
+        update(e, d, dt) {
+          const t = e.components.get("Transform");
+          if (!t) return;
+
+          d.velocity.y += d.gravity * dt;
+          t.position.x += d.velocity.x * dt;
+          t.position.y += d.velocity.y * dt;
+          t.position.z += d.velocity.z * dt;
+
+          if (d.useGround && t.position.y < d.groundY + d.radius) {
+            t.position.y = d.groundY + d.radius;
+            if (d.velocity.y < 0) {
+              d.velocity.y = -d.velocity.y * d.bounce;
+              if (Math.abs(d.velocity.y) < 0.35) d.velocity.y = 0;
+            }
+            d.velocity.x *= 0.985;
+            d.velocity.z *= 0.985;
+          }
+          // мягкие «стены»
+          const b = d.bounds;
+          if (Math.abs(t.position.x) > b) {
+            t.position.x = Math.sign(t.position.x) * b;
+            d.velocity.x *= -d.bounce;
+          }
+          if (Math.abs(t.position.z) > b) {
+            t.position.z = Math.sign(t.position.z) * b;
+            d.velocity.z *= -d.bounce;
+          }
+        },
+      });
+
+      /* ------------------------------- Script -------------------------------- */
+      const DEFAULT_SCRIPT = `// Контекст: entity, world, three, get(type), find(name), log(...), scene
+// Верните объект с методами start() и update(dt)
+const t = get('Transform');
+let time = 0;
+
+return {
+  start() {
+    log('Скрипт запущен: ' + entity.name);
+  },
+  update(dt) {
+    if (!t) return;
+    time += dt;
+    t.rotation.y += dt * 60;                       // градусы/сек
+    t.position.y = 1 + Math.sin(time * 2) * 0.5;   // парение
+  }
+};
+`;
+
+      function compileScript(e, d) {
+        try {
+          const ctx = {
+            entity: e,
+            world,
+            three: THREE,
+            scene,
+            get: (type) => e.components.get(type),
+            find: (name) =>
+              [...world.entities.values()].find((x) => x.name === name),
+            log: (...a) => logLine(a.map(String).join(" "), "sys"),
+          };
+          const fn = new Function(
+            "ctx",
+            `"use strict";
+const { entity, world, three, get, find, log, scene } = ctx;
+${d.source}
+`,
+          );
+          const api = fn(ctx);
+          e.rt.Script = { api: api || null };
+        } catch (err) {
+          logErr(`Script [${e.name}]: ${err.message}`);
+          e.rt.Script = { api: null };
+        }
+      }
+
+      defineComponent("Script", {
+        phase: "behavior",
+        behaviorOnly: true,
+        schema: {
+          source: { type: "code", default: DEFAULT_SCRIPT },
+        },
+        create(e, d) {
+          compileScript(e, d);
+        },
+        update(e, d, dt) {
+          const api = e.rt.Script?.api;
+          if (api && typeof api.update === "function") api.update(dt);
+        },
+        start(e) {
+          const api = e.rt.Script?.api;
+          if (api && typeof api.start === "function") {
+            try {
+              api.start();
+            } catch (err) {
+              logErr(`Script.start [${e.name}]: ${err.message}`);
+            }
+          }
+        },
+        onEdit(e, d) {
+          compileScript(e, d);
+        },
+      });
+
+      /* =========================================================================
+   4. ВЫДЕЛЕНИЕ, ПИКИНГ, ГИЗМО
+   ========================================================================= */
+      let selectedId = null;
+
+      function select(id) {
+        selectedId = id;
+        const e = id ? world.entities.get(id) : null;
+        if (e && e.components.has("Transform") && !world.playing)
+          transformControls.attach(e.group);
+        else transformControls.detach();
+        refreshHierarchy();
+        refreshInspector();
+      }
+
+      transformControls.addEventListener("objectChange", () => {
+        const e = world.entities.get(selectedId);
+        if (!e) return;
+        const t = e.components.get("Transform");
+        if (!t) return;
+        const g = e.group;
+        t.position.x = g.position.x;
+        t.position.y = g.position.y;
+        t.position.z = g.position.z;
+        t.rotation.x = THREE.MathUtils.radToDeg(g.rotation.x);
+        t.rotation.y = THREE.MathUtils.radToDeg(g.rotation.y);
+        t.rotation.z = THREE.MathUtils.radToDeg(g.rotation.z);
+        t.scale.x = g.scale.x;
+        t.scale.y = g.scale.y;
+        t.scale.z = g.scale.z;
+        syncInspectorValues();
+      });
+
+      const raycaster = new THREE.Raycaster();
+      const ndc = new THREE.Vector2();
+      let pointerDownPos = null;
+
+      renderer.domElement.addEventListener("pointerdown", (ev) => {
+        pointerDownPos = { x: ev.clientX, y: ev.clientY };
+      });
+
+      renderer.domElement.addEventListener("pointerup", (ev) => {
+        if (!pointerDownPos) return;
+        const dx = ev.clientX - pointerDownPos.x;
+        const dy = ev.clientY - pointerDownPos.y;
+        pointerDownPos = null;
+        if (Math.hypot(dx, dy) > 4) return; // это был drag камеры/гизмо
+        if (transformControls.dragging) return;
+        if (world.playing) return;
+
+        const rect = renderer.domElement.getBoundingClientRect();
+        ndc.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+        ndc.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(ndc, editorCam);
+
+        const hits = raycaster.intersectObjects(world.container.children, true);
+        for (const h of hits) {
+          let o = h.object;
+          while (o && o.userData.entityId === undefined) o = o.parent;
+          if (o) {
+            select(o.userData.entityId);
+            return;
+          }
+        }
+        select(null);
+      });
+
+      /* =========================================================================
+   5. UI: ИЕРАРХИЯ
+   ========================================================================= */
+      function entityIcon(e) {
+        if (e.components.has("Camera")) return "🎥";
+        if (e.components.has("Light")) return "💡";
+        if (e.components.has("MeshRenderer")) return "◼";
+        return "◦";
+      }
+
+      function refreshHierarchy() {
+        const root = $("#hierarchy");
+        root.innerHTML = "";
+        if (world.entities.size === 0) {
+          root.append(el("div", { class: "empty" }, "Сцена пуста"));
+          return;
+        }
+
+        // дерево по parent
+        const byParent = new Map();
+        for (const e of world.entities.values()) {
+          const t = e.components.get("Transform");
+          let pid = 0;
+          if (
+            t &&
+            t.parent &&
+            world.entities.has(t.parent) &&
+            t.parent !== e.id
+          )
+            pid = t.parent;
+          if (!byParent.has(pid)) byParent.set(pid, []);
+          byParent.get(pid).push(e);
+        }
+
+        const visited = new Set();
+        const walk = (pid, depth) => {
+          for (const e of byParent.get(pid) || []) {
+            if (visited.has(e.id)) continue;
+            visited.add(e.id);
+            const row = el(
+              "div",
+              {
+                class: "hrow" + (e.id === selectedId ? " sel" : ""),
+                dataset: { id: e.id },
+              },
+              el("span", { class: "ico" }, entityIcon(e)),
+              el("span", { class: "nm" }, e.name),
+            );
+            row.style.paddingLeft = 8 + depth * 14 + "px";
+            row.addEventListener("click", () => select(e.id));
+            root.append(row);
+            walk(e.id, depth + 1);
+          }
+        };
+        walk(0, 0);
+
+        // «сироты» (циклы/битые ссылки)
+        for (const e of world.entities.values()) {
+          if (!visited.has(e.id)) {
+            const row = el(
+              "div",
+              {
+                class: "hrow" + (e.id === selectedId ? " sel" : ""),
+                dataset: { id: e.id },
+              },
+              el("span", { class: "ico" }, entityIcon(e)),
+              el("span", { class: "nm" }, e.name),
+            );
+            row.addEventListener("click", () => select(e.id));
+            root.append(row);
+          }
+        }
+      }
+
+      /* =========================================================================
+   6. UI: ИНСПЕКТОР
+   ========================================================================= */
+      function refreshInspector() {
+        const root = $("#inspector");
+        root.innerHTML = "";
+        const e = selectedId ? world.entities.get(selectedId) : null;
+        if (!e) {
+          root.append(el("div", { class: "empty" }, "Ничего не выбрано"));
+          return;
+        }
+
+        // --- заголовок сущности ---
+        const head = el("div", { class: "ent-head" });
+        const nameInput = el("input", {
+          class: "ent-name",
+          value: e.name,
+          spellcheck: false,
+          oninput: () => {
+            e.name = nameInput.value || "Entity";
+            e.group.name = e.name;
+            refreshHierarchy();
+          },
+        });
+        head.append(nameInput);
+        head.append(
+          el(
+            "button",
+            {
+              class: "mini danger",
+              title: "Удалить сущность",
+              onclick: () => {
+                destroyEntity(e);
+                refreshHierarchy();
+                refreshInspector();
+              },
+            },
+            "🗑",
+          ),
+        );
+        root.append(head);
+
+        // --- компоненты ---
+        for (const [type, data] of e.components) {
+          root.append(buildComponentBlock(e, type, data));
+        }
+
+        // --- добавление компонента ---
+        const sel = el("select");
+        sel.append(el("option", { value: "" }, "+ Добавить компонент"));
+        for (const [name] of Components) {
+          if (!e.components.has(name))
+            sel.append(el("option", { value: name }, name));
+        }
+        sel.addEventListener("change", () => {
+          if (!sel.value) return;
+          addComponent(e, sel.value);
+          refreshInspector();
+          refreshHierarchy();
+        });
+        root.append(el("div", { class: "add-comp" }, sel));
+      }
+
+      function buildComponentBlock(e, type, data) {
+        const def = Components.get(type);
+        const block = el("div", { class: "comp" });
+
+        const head = el(
+          "div",
+          { class: "comp-head" },
+          el("span", { class: "comp-title" }, type),
+          el(
+            "button",
+            {
+              class: "mini danger",
+              title: "Удалить компонент",
+              onclick: () => {
+                removeComponent(e, type);
+                refreshInspector();
+                refreshHierarchy();
+              },
+            },
+            "×",
+          ),
+        );
+        block.append(head);
+
+        const body = el("div", { class: "comp-body" });
+        for (const [key, field] of Object.entries(def.schema)) {
+          body.append(buildField(e, type, def, data, key, field));
+        }
+        if (Object.keys(def.schema).length === 0) {
+          body.append(
+            el(
+              "div",
+              { class: "empty", style: { padding: "4px" } },
+              "Нет параметров",
+            ),
+          );
+        }
+        block.append(body);
+        return block;
+      }
+
+      function notifyEdit(e, type, def, data) {
+        try {
+          def.onEdit?.(e, data, world);
+        } catch (err) {
+          logErr(`${type}.onEdit: ${err.message}`);
+        }
+      }
+
+      function buildField(e, type, def, data, key, field) {
+        const path = `${type}.${key}`;
+        const row = el("div", { class: "field" });
+        row.append(el("label", { class: "flabel" }, field.label || key));
+
+        let widget;
+
+        switch (field.type) {
+          case "number": {
+            widget = el("input", {
+              class: "finput",
+              type: "number",
+              value: data[key],
+              step: field.step ?? 0.1,
+              min: field.min,
+              max: field.max,
+              dataset: { path },
+            });
+            widget.addEventListener("input", () => {
+              const v = parseFloat(widget.value);
+              if (!isNaN(v)) {
+                data[key] = v;
+                notifyEdit(e, type, def, data);
+              }
+            });
+            break;
+          }
+          case "boolean": {
+            widget = el("input", {
+              class: "finput",
+              type: "checkbox",
+              checked: !!data[key],
+              dataset: { path },
+            });
+            widget.style.flex = "0 0 auto";
+            widget.style.width = "16px";
+            widget.style.height = "16px";
+            widget.style.cursor = "pointer";
+            widget.addEventListener("change", () => {
+              data[key] = widget.checked;
+              notifyEdit(e, type, def, data);
+            });
+            break;
+          }
+          case "color": {
+            widget = el("input", {
+              class: "finput",
+              type: "color",
+              value: data[key],
+              dataset: { path },
+            });
+            widget.addEventListener("input", () => {
+              data[key] = widget.value;
+              notifyEdit(e, type, def, data);
+            });
+            break;
+          }
+          case "vec3": {
+            widget = el("div", { class: "vec3" });
+            for (const axis of ["x", "y", "z"]) {
+              const inp = el("input", {
+                class: "finput",
+                type: "number",
+                value: data[key]?.[axis] ?? 0,
+                step: field.step ?? 0.1,
+                dataset: { path: `${path}.${axis}` },
+              });
+              inp.addEventListener("input", () => {
+                const v = parseFloat(inp.value);
+                if (!isNaN(v)) {
+                  data[key][axis] = v;
+                  notifyEdit(e, type, def, data);
+                }
+              });
+              widget.append(
+                el("span", { class: "axis-label " + axis }, axis.toUpperCase()),
+                inp,
+              );
+            }
+            break;
+          }
+          case "select": {
+            widget = el("select", { class: "finput", dataset: { path } });
+            for (const opt of field.options || []) {
+              widget.append(
+                el("option", { value: opt, selected: data[key] === opt }, opt),
+              );
+            }
+            widget.addEventListener("change", () => {
+              data[key] = widget.value;
+              notifyEdit(e, type, def, data);
+            });
+            break;
+          }
+          case "entity": {
+            widget = el("select", { class: "finput", dataset: { path } });
+            widget.append(el("option", { value: "0" }, "— нет —"));
+            for (const other of world.entities.values()) {
+              if (other.id === e.id) continue;
+              widget.append(
+                el(
+                  "option",
+                  { value: String(other.id), selected: data[key] === other.id },
+                  other.name,
+                ),
+              );
+            }
+            widget.addEventListener("change", () => {
+              data[key] = parseInt(widget.value, 10) || 0;
+              notifyEdit(e, type, def, data);
+              refreshHierarchy();
+            });
+            break;
+          }
+          case "code": {
+            widget = el("textarea", {
+              class: "finput",
+              spellcheck: false,
+              dataset: { path },
+            });
+            widget.value = data[key] ?? "";
+            widget.rows = 12;
+            widget.addEventListener("change", () => {
+              data[key] = widget.value;
+              notifyEdit(e, type, def, data);
+              logSys(`Код компонента ${type} перекомпилирован`);
+            });
+            row.style.alignItems = "flex-start";
+            row.style.flexDirection = "column";
+            row.firstChild.style.width = "auto";
+            row.firstChild.style.marginBottom = "4px";
+            break;
+          }
+          default: {
+            widget = el("input", {
+              class: "finput",
+              type: "text",
+              value: data[key] ?? "",
+              dataset: { path },
+            });
+            widget.addEventListener("input", () => {
+              data[key] = widget.value;
+              notifyEdit(e, type, def, data);
+            });
+          }
+        }
+
+        widget.dataset.path = widget.dataset.path || path;
+        row.append(widget);
+        return row;
+      }
+
+      /** Обновляет значения полей инспектора без перерисовки (чтобы не терять фокус) */
+      function syncInspectorValues() {
+        const e = selectedId ? world.entities.get(selectedId) : null;
+        if (!e) return;
+        document.querySelectorAll("#inspector [data-path]").forEach((inp) => {
+          if (inp === document.activeElement) return;
+          const [type, key, axis] = inp.dataset.path.split(".");
+          const d = e.components.get(type);
+          if (!d) return;
+          let v = d[key];
+          if (axis) v = v?.[axis];
+          if (inp.type === "checkbox") inp.checked = !!v;
+          else if (inp.type === "color") inp.value = v || "#000000";
+          else if (inp.type === "number")
+            inp.value =
+              Number(v)
+                .toFixed(3)
+                .replace(/\.?0+$/, "") || 0;
+          else inp.value = v ?? "";
+        });
+      }
+
+      /* =========================================================================
+   7. СЕРИАЛИЗАЦИЯ / ДЕСЕРИАЛИЗАЦИЯ
+   ========================================================================= */
+      function serialize() {
+        return {
+          version: 1,
+          entities: [...world.entities.values()].map((e) => ({
+            id: e.id,
+            name: e.name,
+            components: Object.fromEntries(
+              [...e.components].map(([k, v]) => [k, structuredClone(v)]),
+            ),
+          })),
+        };
+      }
+
+      function deserialize(data) {
+        if (!data || !Array.isArray(data.entities))
+          throw new Error("Некорректный формат сцены");
+
+        transformControls.detach();
+        for (const e of [...world.entities.values()]) destroyEntity(e);
+        world.entities.clear();
+        world.container.clear();
+        world.time = 0;
+        _eid = 0;
+        selectedId = null;
+
+        for (const ed of data.entities) {
+          const e = createEntity(ed.name || "Entity", ed.id);
+          for (const [type, cd] of Object.entries(ed.components || {})) {
+            if (!Components.has(type)) {
+              logErr(`Пропущен неизвестный компонент: ${type}`);
+              continue;
+            }
+            addComponent(e, type, cd);
+          }
+        }
+        refreshHierarchy();
+        refreshInspector();
+      }
+
+      /* =========================================================================
+   8. PLAY / STOP
+   ========================================================================= */
+      let playSnapshot = null;
+
+      function play() {
+        if (world.playing) return;
+        playSnapshot = serialize();
+        world.playing = true;
+        world.time = 0;
+        transformControls.detach();
+
+        for (const e of world.entities.values()) {
+          for (const [type, d] of e.components) {
+            const def = Components.get(type);
+            if (!def?.start) continue;
+            try {
+              def.start(e, d, world);
+            } catch (err) {
+              logErr(`${type}.start [${e.name}]: ${err.message}`);
+            }
+          }
+        }
+        $("#play-badge").classList.add("on");
+        logSys("▶ Режим игры запущен");
+      }
+
+      function stop() {
+        if (!world.playing) return;
+        world.playing = false;
+        $("#play-badge").classList.remove("on");
+        if (playSnapshot) {
+          deserialize(playSnapshot);
+          playSnapshot = null;
+        }
+        logSys("⏹ Режим игры остановлен, сцена восстановлена");
+      }
+
+      function getActiveCamera() {
+        if (world.playing) {
+          for (const e of world.entities.values()) {
+            const c = e.components.get("Camera");
+            if (c && c.active && e.rt.Camera) return e.rt.Camera;
+          }
+        }
+        return editorCam;
+      }
+
+      /* =========================================================================
+   9. ПРЕСЕТЫ ОБЪЕКТОВ
+   ========================================================================= */
+      function createPreset(kind) {
+        if (!kind) return;
+        const e = createEntity();
+        addComponent(e, "Transform");
+
+        const t = e.components.get("Transform");
+
+        switch (kind) {
+          case "empty":
+            e.name = "Объект";
+            break;
+          case "cube":
+            e.name = "Куб";
+            addComponent(e, "MeshRenderer", { geometry: "box" });
+            break;
+          case "sphere":
+            e.name = "Сфера";
+            addComponent(e, "MeshRenderer", {
+              geometry: "sphere",
+              color: "#7cf0a8",
+            });
+            break;
+          case "cylinder":
+            e.name = "Цилиндр";
+            addComponent(e, "MeshRenderer", {
+              geometry: "cylinder",
+              color: "#ffc857",
+            });
+            break;
+          case "cone":
+            e.name = "Конус";
+            addComponent(e, "MeshRenderer", {
+              geometry: "cone",
+              color: "#ff8a65",
+            });
+            break;
+          case "torus":
+            e.name = "Тор";
+            addComponent(e, "MeshRenderer", {
+              geometry: "torus",
+              color: "#c792ea",
+            });
+            break;
+          case "capsule":
+            e.name = "Капсула";
+            addComponent(e, "MeshRenderer", {
+              geometry: "capsule",
+              color: "#64b5f6",
+            });
+            break;
+          case "plane":
+            e.name = "Плоскость";
+            t.rotation.x = -90;
+            t.scale.x = 10;
+            t.scale.z = 10;
+            t.scale.y = 10;
+            addComponent(e, "MeshRenderer", {
+              geometry: "plane",
+              color: "#2a3140",
+              castShadow: false,
+              roughness: 0.95,
+            });
+            break;
+          case "light":
+            e.name = "Свет";
+            t.position.y = 6;
+            addComponent(e, "Light", { intensity: 3 });
+            break;
+          case "camera":
+            e.name = "Камера";
+            t.position.y = 3;
+            t.position.z = 9;
+            addComponent(e, "Camera", { active: false });
+            break;
+        }
+
+        // ставим новый объект в центр обзора редактора
+        if (kind !== "light" && kind !== "camera" && kind !== "plane") {
+          t.position.y = 0.5;
+        }
+
+        refreshHierarchy();
+        select(e.id);
+        logSys(`Создан объект: ${e.name}`);
+      }
+
+      /* =========================================================================
+   10. ДЕМО-СЦЕНА
+   ========================================================================= */
+      function buildDemoScene() {
+        // --- земля ---
+        const ground = createEntity("Земля");
+        addComponent(ground, "Transform", {
+          position: { x: 0, y: 0, z: 0 },
+          rotation: { x: -90, y: 0, z: 0 },
+          scale: { x: 40, y: 40, z: 1 },
+        });
+        addComponent(ground, "MeshRenderer", {
+          geometry: "plane",
+          color: "#252c3a",
+          roughness: 0.95,
+          metalness: 0,
+          castShadow: false,
+        });
+
+        // --- вращающийся куб ---
+        const cube = createEntity("Куб");
+        addComponent(cube, "Transform", {
+          position: { x: -2.2, y: 0.5, z: 0 },
+        });
+        addComponent(cube, "MeshRenderer", { color: "#7aa2f7" });
+        addComponent(cube, "Rotator", { speed: { x: 0, y: 45, z: 0 } });
+
+        // --- парящая сфера со скриптом ---
+        const sphere = createEntity("Сфера");
+        addComponent(sphere, "Transform", { position: { x: 0, y: 1, z: 0 } });
+        addComponent(sphere, "MeshRenderer", {
+          geometry: "sphere",
+          color: "#7cf0a8",
+          metalness: 0.4,
+          roughness: 0.25,
+        });
+        addComponent(sphere, "Script", { source: DEFAULT_SCRIPT });
+
+        // --- прыгающая капсула (физика) ---
+        const capsule = createEntity("Прыгун");
+        addComponent(capsule, "Transform", {
+          position: { x: 2.4, y: 5, z: 0 },
+        });
+        addComponent(capsule, "MeshRenderer", {
+          geometry: "capsule",
+          color: "#ffc857",
+        });
+        addComponent(capsule, "RigidBody", {
+          velocity: { x: 0, y: 0, z: 0 },
+          gravity: -20,
+          bounce: 0.65,
+          radius: 0.55,
+        });
+
+        // --- тор ---
+        const torus = createEntity("Тор");
+        addComponent(torus, "Transform", { position: { x: 0, y: 0.7, z: -3 } });
+        addComponent(torus, "MeshRenderer", {
+          geometry: "torus",
+          color: "#c792ea",
+        });
+        addComponent(torus, "Rotator", { speed: { x: 0, y: 0, z: 90 } });
+
+        // --- свет ---
+        const sun = createEntity("Солнце");
+        addComponent(sun, "Transform", {
+          position: { x: 6, y: 12, z: 6 },
+          rotation: { x: 45, y: 25, z: 0 },
+        });
+        addComponent(sun, "Light", {
+          type: "directional",
+          intensity: 3.0,
+          color: "#fff4e0",
+        });
+
+        const fill = createEntity("Заполняющий свет");
+        addComponent(fill, "Transform", { position: { x: -5, y: 4, z: -6 } });
+        addComponent(fill, "Light", {
+          type: "point",
+          intensity: 25,
+          distance: 20,
+          color: "#5aa9ff",
+          castShadow: false,
+        });
+
+        const amb = createEntity("Окружение");
+        addComponent(amb, "Transform");
+        addComponent(amb, "Light", {
+          type: "ambient",
+          intensity: 0.55,
+          color: "#8899bb",
+          castShadow: false,
+        });
+
+        // --- игровая камера ---
+        const cam = createEntity("Игровая камера");
+        addComponent(cam, "Transform", {
+          position: { x: 0, y: 4.5, z: 11 },
+          rotation: { x: -12, y: 0, z: 0 },
+        });
+        addComponent(cam, "Camera", { fov: 55, active: true });
+
+        refreshHierarchy();
+        logSys("Демо-сцена загружена");
+      }
+
+      /* =========================================================================
+   11. ОБРАБОТЧИКИ UI
+   ========================================================================= */
+      $("#btn-play").addEventListener("click", play);
+      $("#btn-stop").addEventListener("click", stop);
+
+      document.querySelectorAll(".mode-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          document
+            .querySelectorAll(".mode-btn")
+            .forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          transformControls.setMode(btn.dataset.mode);
+        });
+      });
+
+      $("#add-select").addEventListener("change", (ev) => {
+        createPreset(ev.target.value);
+        ev.target.value = "";
+      });
+
+      $("#btn-save").addEventListener("click", () => {
+        try {
+          localStorage.setItem("ecs3d.scene", JSON.stringify(serialize()));
+          logSys("Сцена сохранена в localStorage");
+        } catch (err) {
+          logErr("Сохранение: " + err.message);
+        }
+      });
+
+      $("#btn-load").addEventListener("click", () => {
+        const raw = localStorage.getItem("ecs3d.scene");
+        if (!raw) {
+          logErr("Нет сохранённой сцены");
+          return;
+        }
+        try {
+          deserialize(JSON.parse(raw));
+          logSys("Сцена загружена из localStorage");
+        } catch (err) {
+          logErr("Загрузка: " + err.message);
+        }
+      });
+
+      $("#btn-export").addEventListener("click", () => {
+        const blob = new Blob([JSON.stringify(serialize(), null, 2)], {
+          type: "application/json",
+        });
+        const a = el("a", {
+          href: URL.createObjectURL(blob),
+          download: "scene.ecs3d.json",
+        });
+        document.body.append(a);
+        a.click();
+        a.remove();
+        logSys("Сцена экспортирована в файл");
+      });
+
+      $("#btn-import").addEventListener("click", () =>
+        $("#file-input").click(),
+      );
+      $("#file-input").addEventListener("change", (ev) => {
+        const file = ev.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            deserialize(JSON.parse(reader.result));
+            logSys("Сцена импортирована: " + file.name);
+          } catch (err) {
+            logErr("Импорт: " + err.message);
+          }
+        };
+        reader.readAsText(file);
+        ev.target.value = "";
+      });
+
+      /* ---- Горячие клавиши ---- */
+      window.addEventListener("keydown", (ev) => {
+        if (ev.target.matches("input, textarea, select")) return;
+
+        if (ev.code === "KeyW")
+          document.querySelector('[data-mode="translate"]').click();
+        if (ev.code === "KeyE")
+          document.querySelector('[data-mode="rotate"]').click();
+        if (ev.code === "KeyR")
+          document.querySelector('[data-mode="scale"]').click();
+
+        if (ev.code === "Escape") select(null);
+
+        if (
+          (ev.code === "Delete" || ev.code === "Backspace") &&
+          selectedId &&
+          !world.playing
+        ) {
+          const e = world.entities.get(selectedId);
+          if (e) {
+            destroyEntity(e);
+            refreshHierarchy();
+            refreshInspector();
+          }
+        }
+
+        if (ev.code === "KeyF" && selectedId) {
+          const e = world.entities.get(selectedId);
+          if (e) {
+            const p = new THREE.Vector3();
+            e.group.getWorldPosition(p);
+            orbit.target.copy(p);
+            editorCam.position.copy(p).add(new THREE.Vector3(6, 4, 6));
+          }
+        }
+
+        if (ev.code === "Space") {
+          ev.preventDefault();
+          world.playing ? stop() : play();
+        }
+      });
+
+      /* =========================================================================
+   12. ЦИКЛ РЕНДЕРА
+   ========================================================================= */
+      function resize() {
+        const w = viewport.clientWidth;
+        const h = viewport.clientHeight;
+        if (w === 0 || h === 0) return;
+        renderer.setSize(w, h, false);
+        renderer.domElement.style.width = "100%";
+        renderer.domElement.style.height = "100%";
+        editorCam.aspect = w / h;
+        editorCam.updateProjectionMatrix();
+      }
+      new ResizeObserver(resize).observe(viewport);
+
+      let prevTime = performance.now();
+      let fpsAcc = 0,
+        fpsFrames = 0;
+      const fpsEl = $("#fps");
+
+      function loop(now) {
+        requestAnimationFrame(loop);
+        const dt = Math.min((now - prevTime) / 1000, 0.05);
+        prevTime = now;
+
+        updateWorld(dt);
+
+        // FPS
+        fpsAcc += dt;
+        fpsFrames++;
+        if (fpsAcc >= 0.5) {
+          fpsEl.textContent = `${Math.round(fpsFrames / fpsAcc)} FPS · ${world.entities.size} сущностей`;
+          fpsAcc = 0;
+          fpsFrames = 0;
+        }
+
+        // управление
+        orbit.enabled = !world.playing && !transformControls.dragging;
+        if (!world.playing) orbit.update();
+
+        const cam = getActiveCamera();
+        renderer.render(scene, cam);
+      }
+
+      /* =========================================================================
+   13. СТАРТ
+   ========================================================================= */
+      resize();
+      buildDemoScene();
+      select(null);
+      requestAnimationFrame(loop);
+      logSys(
+        "ECS 3D Editor готов. W/E/R — режим гизмо, F — фокус, Space — Play/Stop, Delete — удалить.",
+      );
+    </script>
+  </body>
+</html>

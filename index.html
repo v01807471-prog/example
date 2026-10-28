@@ -1,0 +1,933 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ECS Engine & Inspector</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg-root: #0a0e14;
+        --bg-panel: #111722;
+        --bg-card: #161f2e;
+        --bg-input: #0e141e;
+        --border: #1f2d42;
+        --border-subtle: #192434;
+        --border-accent: rgba(76, 201, 240, 0.4);
+        --text: #e2e8f0;
+        --text-muted: #8899ac;
+        --text-dim: #54657a;
+        --accent-cyan: #4cc9f0;
+        --accent-yellow: #ffc857;
+        --accent-orange: #fb8500;
+        --accent-red: #ff4d4d;
+        --accent-green: #80ed99;
+        --accent-purple: #c77dff;
+        --font-ui:
+          "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", Roboto, sans-serif;
+        --font-mono:
+          "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
+          Consolas, monospace;
+        --radius-sm: 6px;
+        --radius-md: 10px;
+        --radius-lg: 14px;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background: var(--bg-root);
+        color: var(--text);
+        font-family: var(--font-ui);
+        font-size: 13px;
+        line-height: 1.45;
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+
+      /* Scrollbar */
+      ::-webkit-scrollbar {
+        width: 7px;
+        height: 7px;
+      }
+      ::-webkit-scrollbar-track {
+        background: rgba(10, 14, 20, 0.6);
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #23334d;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #344a6d;
+      }
+
+      /* Основная сетка страницы */
+      .app-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 460px;
+        min-height: 100vh;
+        width: 100vw;
+      }
+
+      @media (max-width: 1200px) {
+        .app-layout {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* ─── Левая часть: Вьюпорт симуляции ─── */
+      .viewport-area {
+        display: flex;
+        flex-direction: column;
+        background: radial-gradient(circle at 50% 20%, #131c2b 0%, #0a0e14 70%);
+        border-right: 1px solid var(--border);
+        min-width: 0;
+        overflow-y: auto;
+      }
+
+      .viewport-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 22px;
+        border-bottom: 1px solid var(--border-subtle);
+        background: rgba(17, 23, 34, 0.75);
+        backdrop-filter: blur(8px);
+        position: sticky;
+        top: 0;
+        z-index: 20;
+      }
+
+      .brand-badge {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .brand-logo {
+        width: 26px;
+        height: 26px;
+        border-radius: 7px;
+        background: linear-gradient(135deg, #4cc9f0, #c77dff);
+        display: grid;
+        place-items: center;
+        box-shadow: 0 0 16px rgba(76, 201, 240, 0.45);
+        font-size: 13px;
+        font-weight: 800;
+        color: #0b0f14;
+      }
+      .brand-title {
+        font-weight: 700;
+        font-size: 15px;
+        letter-spacing: -0.01em;
+        color: #fff;
+      }
+      .brand-sub {
+        font-size: 11px;
+        color: var(--text-muted);
+        font-family: var(--font-mono);
+      }
+
+      .viewport-metrics {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .metric-pill {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--accent-cyan);
+        background: rgba(76, 201, 240, 0.1);
+        border: 1px solid rgba(76, 201, 240, 0.25);
+        padding: 4px 10px;
+        border-radius: 999px;
+      }
+
+      .canvas-stage {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        gap: 14px;
+      }
+
+      .canvas-frame {
+        position: relative;
+        background: #0b0f14;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 6px;
+        box-shadow:
+          0 16px 40px rgba(0, 0, 0, 0.6),
+          0 0 0 1px rgba(255, 255, 255, 0.03);
+        max-width: 100%;
+        overflow: hidden;
+      }
+
+      canvas#game {
+        display: block;
+        width: 100%;
+        max-width: 960px;
+        height: auto;
+        aspect-ratio: 960 / 600;
+        border-radius: 10px;
+        background: #0b0f14;
+        cursor: crosshair;
+        touch-action: none;
+      }
+
+      .canvas-tip {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text-muted);
+        font-size: 12px;
+      }
+      .canvas-tip kbd {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 2px 6px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text);
+      }
+
+      /* Блок ошибок */
+      #error {
+        background: rgba(255, 77, 77, 0.15);
+        border: 1px solid var(--accent-red);
+        color: #ff9999;
+        padding: 12px 16px;
+        border-radius: var(--radius-md);
+        font-family: var(--font-mono);
+        font-size: 12px;
+        white-space: pre-wrap;
+        word-break: break-word;
+        margin: 12px 24px 0 24px;
+      }
+      #error[hidden] {
+        display: none;
+      }
+
+      /* ─── Правая часть: Инспектор ─── */
+      .inspector-panel {
+        background: var(--bg-panel);
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        overflow-y: auto;
+        border-left: 1px solid var(--border);
+      }
+
+      .inspector-top {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+        background: rgba(17, 23, 34, 0.95);
+        position: sticky;
+        top: 0;
+        z-index: 15;
+        backdrop-filter: blur(8px);
+      }
+
+      .inspector-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+      }
+      .inspector-title {
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #9eb3cd;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .inspector-title::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--accent-cyan);
+        box-shadow: 0 0 10px var(--accent-cyan);
+      }
+
+      /* KPI Сетка */
+      #kpis {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+      }
+      .kpi {
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-sm);
+        padding: 8px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+      .kpi span {
+        font-size: 11px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+      }
+      .kpi b {
+        font-family: var(--font-mono);
+        font-size: 14px;
+        font-weight: 600;
+        color: #fff;
+      }
+      .kpi.good b {
+        color: var(--accent-green);
+      }
+      .kpi.warn b {
+        color: var(--accent-yellow);
+      }
+      .kpi.bad b {
+        color: var(--accent-red);
+      }
+
+      /* Секции инспектора */
+      .section {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+      }
+      .section-title {
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .controls-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      /* Кнопки переключения режима (JS / WASM) */
+      #mode {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        background: var(--bg-input);
+        padding: 3px;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border);
+        gap: 3px;
+      }
+
+      #renderMode {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        background: var(--bg-input);
+        padding: 3px;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border);
+        gap: 3px;
+      }
+      #mode button, #renderMode button {
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        font-family: var(--font-ui);
+        font-size: 11px;
+        font-weight: 600;
+        padding: 7px 4px;
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        transition: all 0.15s ease;
+        text-align: center;
+      }
+      #mode button:hover:not(:disabled), #renderMode button:hover:not(:disabled) {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.04);
+      }
+      #mode button.on, #renderMode button.on {
+        background: #22344f;
+        color: #fff;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+        border: 1px solid rgba(76, 201, 240, 0.4);
+      }
+      #mode button:disabled, #renderMode button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      /* Ползунок сущностей */
+      .slider-row {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        background: var(--bg-card);
+        padding: 10px 12px;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border-subtle);
+      }
+      .slider-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 12px;
+      }
+      .slider-header span {
+        color: var(--text-muted);
+      }
+      #targetOut {
+        font-family: var(--font-mono);
+        font-weight: 700;
+        color: var(--accent-cyan);
+      }
+      input[type="range"] {
+        -webkit-appearance: none;
+        width: 100%;
+        height: 5px;
+        border-radius: 3px;
+        background: #1f2d42;
+        outline: none;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 15px;
+        height: 15px;
+        border-radius: 50%;
+        background: var(--accent-cyan);
+        cursor: pointer;
+        box-shadow: 0 0 8px rgba(76, 201, 240, 0.6);
+        transition: transform 0.1s ease;
+      }
+      input[type="range"]::-webkit-slider-thumb:hover {
+        transform: scale(1.15);
+      }
+
+      /* Кнопки действий */
+      .action-btn-row {
+        display: flex;
+        gap: 8px;
+      }
+      .btn {
+        flex: 1;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        color: var(--text);
+        font-family: var(--font-ui);
+        font-size: 12px;
+        font-weight: 600;
+        padding: 8px 12px;
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        transition: all 0.15s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+      .btn:hover {
+        background: #1c283c;
+        border-color: #2b3e5c;
+      }
+      .btn:active {
+        transform: scale(0.98);
+      }
+      .btn.on {
+        background: #4a2828;
+        border-color: #ff4d4d;
+        color: #ff9999;
+      }
+
+      /* Инфо-блок WASM */
+      #wasmNote {
+        font-size: 11px;
+        line-height: 1.4;
+        color: var(--text-muted);
+        background: rgba(10, 14, 20, 0.5);
+        border-left: 2px solid var(--accent-cyan);
+        padding: 6px 10px;
+        border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+        font-family: var(--font-mono);
+      }
+
+      /* Профайлер / График */
+      .chart-container {
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-md);
+        padding: 10px;
+      }
+      canvas#chart {
+        display: block;
+        width: 100%;
+        height: 230px;
+      }
+
+      #legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 12px;
+        margin-top: 10px;
+        font-size: 11px;
+        font-family: var(--font-mono);
+      }
+      #legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        color: var(--text-muted);
+      }
+      #legend i {
+        display: inline-block;
+        width: 9px;
+        height: 9px;
+        border-radius: 2px;
+      }
+
+      /* Расписание систем */
+      #systems {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      label.sys {
+        display: grid;
+        grid-template-columns: auto auto 110px 1fr 50px;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        font-size: 12px;
+        transition: background 0.1s ease;
+      }
+      label.sys:hover {
+        background: #1b2638;
+      }
+      label.sys input[type="checkbox"] {
+        accent-color: var(--accent-cyan);
+        cursor: pointer;
+      }
+      label.sys i {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+      .sys-name {
+        font-family: var(--font-mono);
+        font-weight: 500;
+        color: #e2e8f0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .sys-bar {
+        height: 6px;
+        background: #0f1520;
+        border-radius: 3px;
+        overflow: hidden;
+        position: relative;
+      }
+      .sys-bar b {
+        display: block;
+        height: 100%;
+        background: var(--accent-cyan);
+        border-radius: 3px;
+        transition: width 0.1s linear;
+      }
+      .sys-ms {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        text-align: right;
+        color: var(--text-muted);
+      }
+
+      /* Архетипы */
+      #archetypes {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .arch {
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+        transition: border-color 0.15s ease;
+      }
+      .arch.open {
+        border-color: #2e4363;
+      }
+      .arch-head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 12px;
+        cursor: pointer;
+        background: rgba(255, 255, 255, 0.02);
+        font-size: 12px;
+      }
+      .arch-head:hover {
+        background: rgba(255, 255, 255, 0.05);
+      }
+      .arch-head i {
+        width: 9px;
+        height: 9px;
+        border-radius: 2px;
+        flex-shrink: 0;
+      }
+      .arch-head b {
+        font-family: var(--font-mono);
+        font-weight: 600;
+        color: #fff;
+        flex: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .arch-head .muted {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--text-dim);
+      }
+      .arch-head .chev {
+        font-size: 10px;
+        color: var(--text-muted);
+        transition: transform 0.15s ease;
+      }
+      .arch.open .arch-head .chev {
+        transform: rotate(90deg);
+      }
+      .arch-stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 14px;
+        padding: 6px 12px 10px 12px;
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+      .arch-stats em {
+        font-style: normal;
+        font-family: var(--font-mono);
+        font-weight: 600;
+        color: #e2e8f0;
+        margin-right: 3px;
+      }
+      .fillbar {
+        height: 16px;
+        background: #0d131c;
+        position: relative;
+        margin: 0 12px 10px 12px;
+        border-radius: 3px;
+        overflow: hidden;
+        border: 1px solid var(--border-subtle);
+      }
+      .fillbar b {
+        display: block;
+        height: 100%;
+        border-radius: 2px;
+        transition: width 0.15s ease;
+      }
+      .fillbar u {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        font-weight: 600;
+        color: #fff;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+      }
+      table.mini {
+        width: calc(100% - 24px);
+        margin: 0 12px 10px 12px;
+        border-collapse: collapse;
+        font-family: var(--font-mono);
+        font-size: 11px;
+      }
+      table.mini th,
+      table.mini td {
+        padding: 5px 8px;
+        text-align: left;
+        border-bottom: 1px solid var(--border-subtle);
+      }
+      table.mini th {
+        color: var(--text-muted);
+        font-weight: 500;
+        background: #111722;
+      }
+      table.mini td {
+        color: #cbd5e1;
+      }
+      .muted {
+        color: var(--text-muted);
+      }
+      .small {
+        font-size: 11px;
+        line-height: 1.4;
+        padding: 0 12px 10px 12px;
+      }
+
+      /* Карта памяти WebAssembly */
+      .mem-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-md);
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      canvas#memmap {
+        display: block;
+        width: 100%;
+        background: #0b0f14;
+        border-radius: var(--radius-sm);
+        cursor: crosshair;
+      }
+      #memhover {
+        min-height: 18px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--accent-yellow);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #memtext {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 11px;
+        color: var(--text-muted);
+        line-height: 1.45;
+      }
+      #memtext b {
+        color: #e2e8f0;
+      }
+      #memtext code {
+        font-family: var(--font-mono);
+        color: var(--accent-cyan);
+        background: rgba(76, 201, 240, 0.08);
+        padding: 1px 4px;
+        border-radius: 3px;
+      }
+      .legend-mem {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 12px;
+        margin-top: 6px;
+        padding-top: 8px;
+        border-top: 1px solid var(--border-subtle);
+        font-family: var(--font-mono);
+        font-size: 11px;
+      }
+      .legend-mem span {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        color: var(--text-muted);
+      }
+      .legend-mem i {
+        width: 8px;
+        height: 8px;
+        border-radius: 2px;
+        display: inline-block;
+      }
+      .legend-mem i.ring {
+        border: 1px solid var(--accent-yellow);
+        background: transparent;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-layout">
+      <!-- СЛЕВА: Область симуляции и холст игры -->
+      <main class="viewport-area">
+        <header class="viewport-header">
+          <div class="brand-badge">
+            <div class="brand-logo">E</div>
+            <div>
+              <div class="brand-title">WASM / JS ECS Simulation</div>
+              <div class="brand-sub">
+                Archetype Engine · High-Performance Benchmark
+              </div>
+            </div>
+          </div>
+          <div class="viewport-metrics">
+            <div class="metric-pill" id="fps">-- fps · -- мс</div>
+          </div>
+        </header>
+
+        <!-- Контейнер для сообщений об ошибках -->
+        <div id="error" hidden></div>
+
+        <section class="canvas-stage">
+          <div class="canvas-frame">
+            <canvas id="game-webgl" width="960" height="600"></canvas>
+            <canvas id="game-2d" width="960" height="600"></canvas>
+          </div>
+          <div class="canvas-tip">
+            <span
+              >💡 Зажмите <kbd>ЛКМ</kbd> и водите курсором по холсту для
+              притяжения частиц</span
+            >
+          </div>
+        </section>
+      </main>
+
+      <!-- СПРАВА: Инспектор ECS -->
+      <aside class="inspector-panel">
+        <!-- Шапка инспектора с ключевыми метриками -->
+        <div class="inspector-top">
+          <div class="inspector-heading">
+            <div class="inspector-title">Инспектор ECS</div>
+          </div>
+          <div id="kpis">
+            <!-- Заполняется динамически методом updateUi() -->
+          </div>
+        </div>
+
+        <!-- Секция: Управление режимами и сущностями -->
+        <section class="section">
+          <div class="section-title">
+            <span>Управление движком</span>
+          </div>
+          <div class="controls-grid">
+            <!-- Режим физики -->
+            <div
+              style="
+                font-size: 11px;
+                color: var(--text-muted);
+                margin-bottom: 2px;
+              "
+            >
+              Физика / вычисления:
+            </div>
+            <div id="mode">
+              <button type="button" data-mode="js">JS</button>
+              <button type="button" data-mode="scalar">WASM Scalar</button>
+              <button type="button" data-mode="simd" class="on">
+                WASM SIMD
+              </button>
+            </div>
+
+            <!-- Режим рендера -->
+            <div
+              style="
+                font-size: 11px;
+                color: var(--text-muted);
+                margin-top: 6px;
+                margin-bottom: 2px;
+              "
+            >
+              Графика / рендер:
+            </div>
+            <div id="renderMode">
+              <button type="button" data-render="2d">Canvas 2D (CPU)</button>
+              <button type="button" data-render="webgl" class="on">
+                WebGL (GPU)
+              </button>
+            </div>
+
+            <!-- Слайдер целевого количества сущностей -->
+            <div class="slider-row">
+              <div class="slider-header">
+                <span>Целевое число сущностей:</span>
+                <span id="targetOut">20 000</span>
+              </div>
+              <input
+                type="range"
+                id="target"
+                min="1000"
+                max="1000000"
+                step="1000"
+                value="20000"
+              />
+            </div>
+
+            <!-- Кнопки паузы и заморозки -->
+            <div class="action-btn-row">
+              <button type="button" class="btn" id="pause">Пауза</button>
+              <button type="button" class="btn" id="freeze">Заморозить</button>
+              <button type="button" class="btn" id="thaw">Разморозить</button>
+            </div>
+
+            <!-- Статус WASM модуля -->
+            <div id="wasmNote">Инициализация движка...</div>
+          </div>
+        </section>
+
+        <!-- Секция: Профайлер кадров -->
+        <section class="section">
+          <div class="section-title">
+            <span>Профайлер кадров (240 ticks)</span>
+          </div>
+          <div class="chart-container">
+            <canvas id="chart"></canvas>
+            <div id="legend"></div>
+          </div>
+        </section>
+
+        <!-- Секция: Системы и их производительность -->
+        <section class="section">
+          <div class="section-title">
+            <span>Системы в расписании</span>
+          </div>
+          <div id="systems">
+            <!-- Заполняется динамически из расписания -->
+          </div>
+        </section>
+
+        <!-- Секция: Архетипы -->
+        <section class="section">
+          <div class="section-title">
+            <span>Архетипы и чанки</span>
+          </div>
+          <div id="archetypes">
+            <!-- Заполняется динамически методом updateUi() -->
+          </div>
+        </section>
+
+        <!-- Секция: Карта памяти WASM -->
+        <section class="section">
+          <div class="section-title">
+            <span>Карта WebAssembly памяти</span>
+          </div>
+          <div class="mem-card">
+            <canvas id="memmap"></canvas>
+            <div id="memhover"></div>
+            <div id="memtext"></div>
+          </div>
+        </section>
+      </aside>
+    </div>
+
+    <!-- Подключение вашего скрипта (измените путь на ваш bundle или точку входа, например main.ts при Vite) -->
+    <script type="module" src="./src/game.ts"></script>
+  </body>
+</html>

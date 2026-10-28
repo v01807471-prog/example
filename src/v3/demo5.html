@@ -1,0 +1,1768 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>
+      Nightingale Ecosystem: Hidden Traits, Alchemy, Cooking & Metallurgy
+    </title>
+    <style>
+      :root {
+        --bg-dark: #070c12;
+        --bg-panel: #0e1622;
+        --bg-card: #142132;
+        --border: #1d3148;
+        --border-accent: #38bdf8;
+        --text: #e2e8f0;
+        --text-muted: #64748b;
+        --accent: #38bdf8;
+        --gold: #f59e0b;
+        --green: #10b981;
+        --purple: #a855f7;
+        --red: #ef4444;
+        --amber: #d97706;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      }
+      body {
+        background: var(--bg-dark);
+        color: var(--text);
+        padding: 16px;
+        font-size: 13.5px;
+      }
+
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 12px;
+        margin-bottom: 14px;
+      }
+      header h1 {
+        font-size: 19px;
+        color: var(--accent);
+        letter-spacing: 0.5px;
+      }
+
+      .stations-nav {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 14px;
+        overflow-x: auto;
+        padding-bottom: 4px;
+      }
+      .station-btn {
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 7px 13px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: 0.15s;
+        white-space: nowrap;
+        font-size: 12.5px;
+      }
+      .station-btn.active {
+        background: #1d4ed8;
+        border-color: var(--accent);
+        color: #fff;
+        font-weight: 600;
+        box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
+      }
+
+      .main-grid {
+        display: grid;
+        grid-template-columns: 310px 1fr 350px;
+        gap: 14px;
+      }
+      @media (max-width: 1250px) {
+        .main-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .panel {
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 13px;
+        display: flex;
+        flex-direction: column;
+        gap: 11px;
+        min-height: 640px;
+      }
+      .panel-title {
+        font-size: 13.5px;
+        font-weight: 600;
+        color: var(--accent);
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 7px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      /* Список чертежей */
+      .recipe-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        max-height: 620px;
+        overflow-y: auto;
+      }
+      .recipe-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        padding: 9px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: 0.15s;
+      }
+      .recipe-card:hover {
+        border-color: var(--accent);
+        background: #18283a;
+      }
+      .recipe-card.active {
+        border-color: var(--gold);
+        background: #1a2f47;
+      }
+      .recipe-card.alch {
+        border-left: 3px solid var(--purple);
+      }
+      .recipe-card.cook {
+        border-left: 3px solid var(--amber);
+      }
+      .recipe-card.forge {
+        border-left: 3px solid var(--red);
+      }
+      .recipe-card.basic {
+        border-left: 3px solid var(--green);
+      }
+      .recipe-card .title {
+        font-weight: 600;
+        color: #fff;
+        display: flex;
+        justify-content: space-between;
+        font-size: 12.8px;
+      }
+      .recipe-card .meta {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 3px;
+        display: flex;
+        justify-content: space-between;
+      }
+
+      /* Слоты изделия */
+      .craft-core {
+        display: flex;
+        flex-direction: column;
+        gap: 11px;
+      }
+      .slots-container {
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+        max-height: 480px;
+        overflow-y: auto;
+        padding-right: 4px;
+      }
+      .slot-row {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        padding: 9px 10px;
+        border-radius: 6px;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .slot-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .slot-name {
+        font-weight: 600;
+        color: #fff;
+        font-size: 12.5px;
+      }
+      .slot-req {
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+      .slot-badge-req {
+        background: rgba(239, 68, 68, 0.2);
+        color: var(--red);
+        padding: 1px 6px;
+        border-radius: 4px;
+        font-size: 10px;
+      }
+      .slot-badge-opt {
+        background: rgba(56, 189, 248, 0.15);
+        color: var(--accent);
+        padding: 1px 6px;
+        border-radius: 4px;
+        font-size: 10px;
+      }
+
+      select.mat-select {
+        width: 100%;
+        background: #091018;
+        border: 1px solid var(--border);
+        color: #fff;
+        padding: 6px 9px;
+        border-radius: 4px;
+        outline: none;
+        font-size: 12px;
+      }
+      select.mat-select:focus {
+        border-color: var(--accent);
+      }
+
+      .slot-stat-preview {
+        font-size: 11px;
+        color: var(--green);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+      }
+      .hidden-trait-tag {
+        color: var(--purple);
+        font-weight: 600;
+        font-size: 11px;
+      }
+
+      .action-btn {
+        background: var(--green);
+        border: none;
+        color: #000;
+        font-weight: 700;
+        padding: 11px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: 0.2s;
+        text-align: center;
+        font-size: 13.5px;
+      }
+      .action-btn:hover {
+        background: #34d399;
+      }
+
+      /* Превью результата */
+      .item-name-preview {
+        background: #111e2d;
+        border: 1px solid var(--gold);
+        border-radius: 6px;
+        padding: 11px;
+        text-align: center;
+      }
+      .final-title-row {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
+      }
+      .final-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: #fff;
+      }
+      .dynamic-tier-badge {
+        background: var(--gold);
+        color: #000;
+        font-weight: 800;
+        font-size: 10.5px;
+        padding: 2px 7px;
+        border-radius: 4px;
+      }
+      .gear-score-tag {
+        font-size: 11.5px;
+        color: var(--accent);
+        font-weight: 600;
+        margin-top: 2px;
+      }
+      .breakdown {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 3px;
+      }
+      .revealed-box {
+        margin-top: 5px;
+        font-size: 11.5px;
+        color: var(--purple);
+        font-weight: 600;
+      }
+
+      /* Прочность и износ */
+      .durability-box {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .durability-bar-bg {
+        width: 100%;
+        height: 6px;
+        background: #091018;
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      .durability-bar-fill {
+        height: 100%;
+        background: var(--green);
+        width: 100%;
+        transition: 0.2s;
+      }
+      .durability-controls {
+        display: flex;
+        gap: 6px;
+      }
+      .durability-btn {
+        flex: 1;
+        background: #1a2534;
+        border: 1px solid var(--border);
+        color: #fff;
+        padding: 4px 6px;
+        font-size: 11px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .durability-btn:hover {
+        background: #28374d;
+      }
+
+      /* Таблица характеристик с затемнением */
+      .stat-table {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .stat-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 4px 7px;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.015);
+        transition: 0.15s;
+      }
+      .stat-row.active-stat {
+        background: rgba(56, 189, 248, 0.08);
+        border-left: 3px solid var(--accent);
+      }
+      .stat-row.active-stat .stat-val {
+        color: var(--green);
+        font-weight: 600;
+      }
+      .stat-row.active-stat .stat-name {
+        color: #fff;
+      }
+
+      /* Затемнение нулевых/неактивных параметров */
+      .stat-row.dimmed-stat {
+        opacity: 0.22;
+        filter: grayscale(90%);
+      }
+      .stat-row.dimmed-stat .stat-val {
+        color: var(--text-muted);
+        font-weight: 400;
+      }
+
+      /* Манекен */
+      .dummy-controls {
+        background: var(--bg-card);
+        padding: 8px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .dummy-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 11.5px;
+      }
+      .dummy-row input[type="number"],
+      .dummy-row select {
+        width: 90px;
+        background: #091018;
+        border: 1px solid var(--border);
+        color: #fff;
+        padding: 3px 5px;
+        border-radius: 4px;
+        font-size: 11.5px;
+      }
+      .combat-log {
+        background: #05080d;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 8px;
+        height: 95px;
+        overflow-y: auto;
+        font-family: monospace;
+        font-size: 11px;
+        color: #cbd5e1;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1>Nightingale: Скрытый потенциал и Полная экосистема</h1>
+        <span style="font-size: 12px; color: var(--text-muted)"
+          >Плавильня руд • Алхимия и Порох • Очаг (Мясо и Еда) • Древо деталей •
+          Случайное раскрытие скрытых свойств</span
+        >
+      </div>
+      <div style="font-size: 12px; color: var(--gold)" id="invCounter">
+        Склад: 0 позиций
+      </div>
+    </header>
+
+    <div class="stations-nav" id="stationsNav"></div>
+
+    <div class="main-grid">
+      <!-- 1. Выбор чертежа -->
+      <div class="panel">
+        <div class="panel-title">
+          <span>Каталог рецептов</span>
+          <span
+            id="stationTitle"
+            style="font-size: 12px; color: var(--gold)"
+          ></span>
+        </div>
+        <div class="recipe-list" id="recipeList"></div>
+      </div>
+
+      <!-- 2. Рабочее поле со слотами -->
+      <div class="panel craft-core">
+        <div class="panel-title">
+          <span id="selectedRecipeHeader">Узлы сборки</span>
+          <span
+            id="blueprintStatus"
+            style="font-size: 11px; color: var(--green)"
+          ></span>
+        </div>
+
+        <div class="slots-container" id="slotsContainer"></div>
+
+        <div class="item-name-preview">
+          <div class="final-title-row">
+            <span class="final-title" id="previewItemName">—</span>
+            <span class="dynamic-tier-badge" id="previewTierBadge">Т1</span>
+          </div>
+          <div class="gear-score-tag" id="previewGearScore">
+            Рейтинг снаряжения (Item Power): 0
+          </div>
+          <div class="breakdown" id="previewItemFormula">
+            Выберите компоненты
+          </div>
+          <div class="revealed-box" id="revealedBox"></div>
+        </div>
+
+        <button class="action-btn" id="craftBtn">
+          Создать предмет / полуфабрикат
+        </button>
+      </div>
+
+      <!-- 3. Характеристики, Износ и Манекен -->
+      <div class="panel">
+        <div class="panel-title">
+          <span>Спецификация характеристик</span>
+          <span style="font-size: 11px; color: var(--text-muted)"
+            >Затемнены нули</span
+          >
+        </div>
+
+        <!-- Модуль износа -->
+        <div class="durability-box">
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              font-size: 11.5px;
+            "
+          >
+            <span>Прочность предмета:</span>
+            <span
+              id="durabilityPercentText"
+              style="color: var(--green); font-weight: 700"
+              >100% (Идеально)</span
+            >
+          </div>
+          <div class="durability-bar-bg">
+            <div class="durability-bar-fill" id="durabilityFill"></div>
+          </div>
+          <div class="durability-controls">
+            <button class="durability-btn" id="useItemBtn">
+              Использовать (-15% прочн.)
+            </button>
+            <button class="durability-btn" id="repairItemBtn">
+              Ремонт на базе
+            </button>
+          </div>
+        </div>
+
+        <div class="stat-table" id="statSheet"></div>
+
+        <div class="panel-title" style="margin-top: 4px">
+          <span>Тестовый манекен</span>
+          <span style="font-size: 11px; color: var(--accent)">Бой</span>
+        </div>
+
+        <div class="dummy-controls">
+          <div class="dummy-row">
+            <span>Здоровье (HP):</span>
+            <input type="number" id="dummyHp" value="650" />
+          </div>
+          <div class="dummy-row">
+            <span>Броня (% снижения):</span>
+            <input type="number" id="dummyArmor" value="20" />
+          </div>
+          <div class="dummy-row">
+            <span>Тип существа:</span>
+            <select id="dummyType">
+              <option value="normal">Обычное</option>
+              <option value="ghost">Призрак (иммун к физ.)</option>
+              <option value="armored">Бронированный зверь</option>
+            </select>
+          </div>
+          <div class="dummy-row">
+            <span>Слабость / Стихия:</span>
+            <select id="dummyWeakness">
+              <option value="none">Нет</option>
+              <option value="fire">Огонь</option>
+              <option value="magick">Астрал</option>
+            </select>
+          </div>
+          <button
+            class="station-btn"
+            style="width: 100%; text-align: center; margin-top: 2px"
+            id="testHitBtn"
+          >
+            Нанести пробный удар
+          </button>
+        </div>
+
+        <div class="combat-log" id="combatLog">Готов к испытаниям...</div>
+      </div>
+    </div>
+
+    <script>
+      // ==================== СКЛАД СЫРЬЯ (РУДЫ, КАМНИ, ТРАВЫ, МЯСО, ЦВЕТЫ, ЯГОДЫ) ====================
+      // У некоторых ресурсов есть скрытый потенциал (hiddenTrait), который проявляется при крафте!
+      let playerInventory = [
+        // Руды
+        {
+          id: "ore_tin_1",
+          category: "Руда",
+          name: "Олово",
+          tier: 1,
+          stats: { critChance: 4, critDamage: 10 },
+          hiddenTrait: { name: "Лёгкая жила", stat: "moveSpeedPct", val: 3 },
+        },
+        {
+          id: "ore_copper_1",
+          category: "Руда",
+          name: "Медь",
+          tier: 1,
+          stats: { meleeDmgPct: 5, durability: 20 },
+        },
+        {
+          id: "ore_iron_2",
+          category: "Руда",
+          name: "Железо",
+          tier: 2,
+          stats: { meleeDmgPct: 15, maxHealth: 20 },
+          hiddenTrait: {
+            name: "Закалённая структура",
+            stat: "durability",
+            val: 30,
+          },
+        },
+        {
+          id: "ore_silver_3",
+          category: "Руда",
+          name: "Серебро",
+          tier: 3,
+          stats: { magickPowerPct: 15, critChance: 8 },
+        },
+        {
+          id: "ore_gold_4",
+          category: "Руда",
+          name: "Золото",
+          tier: 4,
+          stats: { magickPowerPct: 25, durability: -10 },
+          hiddenTrait: {
+            name: "Благородный блеск",
+            stat: "magickPowerPct",
+            val: 8,
+          },
+        },
+
+        // Минералы и Химия
+        {
+          id: "chem_sulfur_1",
+          category: "Сера",
+          name: "Самородная сера",
+          tier: 1,
+          stats: { fireResist: 10 },
+        },
+        {
+          id: "chem_saltpeter_1",
+          category: "Селитра",
+          name: "Белая селитра",
+          tier: 1,
+          stats: { rangedDmgPct: 5 },
+        },
+        {
+          id: "chem_coal_1",
+          category: "Уголь",
+          name: "Древесный уголь",
+          tier: 1,
+          stats: { durability: 15 },
+        },
+
+        // Травы, Цветы, Ягоды
+        {
+          id: "herb_bloom_1",
+          category: "Трава",
+          name: "Полевой тысячелистник",
+          tier: 1,
+          stats: { healthRegen: 1.5 },
+          hiddenTrait: { name: "Целебный сок", stat: "maxHealth", val: 15 },
+        },
+        {
+          id: "flower_night_2",
+          category: "Цветок",
+          name: "Ночной колокольчик",
+          tier: 2,
+          stats: { magickPowerPct: 12, staminaRegen: 0.6 },
+        },
+        {
+          id: "berry_frost_1",
+          category: "Ягоды",
+          name: "Морозная клюква",
+          tier: 1,
+          stats: { envResist: 10 },
+        },
+        {
+          id: "fiber_hemp_1",
+          category: "Волокно",
+          name: "Конопляный стебель",
+          tier: 1,
+          stats: { staminaRegen: 0.4 },
+        },
+
+        // Древесина и ветки
+        {
+          id: "stick_pine_1",
+          category: "Палка",
+          name: "Сосновая ветка",
+          tier: 1,
+          stats: { durability: 20 },
+        },
+        {
+          id: "wood_pine_1",
+          category: "Бревно",
+          name: "Сосна",
+          tier: 1,
+          stats: { rangedDmgPct: 4, durability: 25 },
+        },
+        {
+          id: "wood_oak_2",
+          category: "Бревно",
+          name: "Дуб",
+          tier: 2,
+          stats: { durability: 55, maxHealth: 15 },
+          hiddenTrait: { name: "Каменная древесина", stat: "armor", val: 5 },
+        },
+        {
+          id: "wood_yew_3",
+          category: "Бревно",
+          name: "Тис",
+          tier: 3,
+          stats: { rangedDmgPct: 18, critDamage: 20 },
+        },
+
+        // Мясо и Шкуры
+        {
+          id: "meat_pred_raw_2",
+          category: "Сырое мясо",
+          name: "Хищник (Волк фей)",
+          tier: 2,
+          stats: { meleeDmgPct: 8, maxHealth: 25 },
+          hiddenTrait: { name: "Дикая ярость", stat: "critChance", val: 4 },
+        },
+        {
+          id: "meat_prey_raw_1",
+          category: "Сырое мясо",
+          name: "Травоядный олень",
+          tier: 1,
+          stats: { staminaRegen: 1.0, maxHealth: 15 },
+        },
+        {
+          id: "hide_pred_1",
+          category: "Шкура",
+          name: "Хищник",
+          tier: 1,
+          stats: { meleeDmgPct: 6, moveSpeedPct: 3 },
+        },
+        {
+          id: "hide_chitin_3",
+          category: "Шкура",
+          name: "Хитин паука",
+          tier: 3,
+          stats: { envResist: 20, fireResist: 15 },
+        },
+
+        // Эссенции
+        {
+          id: "ess_fire_2",
+          category: "Эссенция",
+          name: "Пламя",
+          tier: 2,
+          stats: { fireResist: 25, element: "fire" },
+        },
+        {
+          id: "ess_magick_3",
+          category: "Эссенция",
+          name: "Астрал",
+          tier: 3,
+          stats: { magickPowerPct: 20, element: "magick" },
+        },
+
+        // Стартовые полуфабрикаты
+        {
+          id: "ingot_copper_1",
+          category: "Слиток",
+          name: "Медь",
+          tier: 1,
+          stats: { meleeDmgPct: 5, durability: 20 },
+        },
+        {
+          id: "ingot_tin_1",
+          category: "Слиток",
+          name: "Олово",
+          tier: 1,
+          stats: { critChance: 4, critDamage: 10 },
+        },
+        {
+          id: "plank_oak_2",
+          category: "Доска",
+          name: "Дуб",
+          tier: 2,
+          stats: { durability: 55, maxHealth: 15 },
+        },
+        {
+          id: "powder_gun_1",
+          category: "Порох",
+          name: "Дымный порох",
+          tier: 1,
+          stats: { rangedDmgPct: 15 },
+        },
+      ];
+
+      // Станки полного цикла
+      const STATIONS = [
+        { id: "smelter", name: "1. Литейная плавильня (Слитки и Сплавы)" },
+        { id: "alchemy", name: "2. Алхимическая ступка (Порох и Зелья)" },
+        { id: "cooking", name: "3. Кулинарный очаг (Мясо и Еда)" },
+        {
+          id: "wood_textile",
+          name: "4. Столярка и Текстиль (Доски, Нити, Древки)",
+        },
+        {
+          id: "fittings",
+          name: "5. Слесарный цех (Трубы, Проволока, Пружины)",
+        },
+        { id: "arsenal", name: "6. Оружейный арсенал (Мечи, Ружья, Броня)" },
+      ];
+
+      // ==================== РЕЕСТР ВСЕХ РЕЦЕПТОВ ====================
+      let RECIPES = [
+        // --- 1. ПЛАВИЛЬНЯ ---
+        {
+          id: "smelt_pure_ingot",
+          station: "smelter",
+          name: "Отливка чистого слитка",
+          category: "Слиток",
+          type: "forge",
+          baseStats: { durability: 50 },
+          slots: [
+            {
+              id: "ore_main",
+              label: "Добытая руда",
+              reqCategory: ["Руда"],
+              required: true,
+            },
+          ],
+        },
+        {
+          id: "smelt_alloy_ingot",
+          station: "smelter",
+          name: "Выплавка легированного сплава",
+          category: "Слиток",
+          type: "forge",
+          baseStats: { durability: 65, meleeDmgPct: 5 },
+          slots: [
+            {
+              id: "ore1",
+              label: "Базовая руда",
+              reqCategory: ["Руда"],
+              required: true,
+            },
+            {
+              id: "ore2",
+              label: "Легирующий металл",
+              reqCategory: ["Руда"],
+              required: true,
+            },
+            {
+              id: "flux",
+              label: "Флюс (Уголь)",
+              reqCategory: ["Уголь"],
+              required: false,
+            },
+          ],
+        },
+
+        // --- 2. АЛХИМИЯ И ПОРОХ ---
+        {
+          id: "alch_gunpowder",
+          station: "alchemy",
+          name: "Смешивание дымного пороха",
+          category: "Порох",
+          type: "alch",
+          baseStats: { rangedDmgPct: 15 },
+          slots: [
+            {
+              id: "saltpeter",
+              label: "1. Селитра",
+              reqCategory: ["Селитра"],
+              required: true,
+            },
+            {
+              id: "sulfur",
+              label: "2. Сера",
+              reqCategory: ["Сера"],
+              required: true,
+            },
+            {
+              id: "coal",
+              label: "3. Угольный порошок",
+              reqCategory: ["Уголь"],
+              required: true,
+            },
+          ],
+        },
+        {
+          id: "alch_ammo_cartridge",
+          station: "alchemy",
+          name: "Оружейные боевые патроны",
+          category: "Боеприпасы",
+          type: "alch",
+          baseStats: { rangedDamage: 25, critChance: 5 },
+          slots: [
+            {
+              id: "powder",
+              label: "1. Навеска пороха",
+              reqCategory: ["Порох"],
+              required: true,
+            },
+            {
+              id: "bullet",
+              label: "2. Свинцовая/медная пуля",
+              reqCategory: ["Слиток"],
+              required: true,
+            },
+          ],
+        },
+        {
+          id: "alch_healing_tonic",
+          station: "alchemy",
+          name: "Восстанавливающий травяной тоник",
+          category: "Зелье",
+          type: "alch",
+          baseStats: { maxHealth: 35, healthRegen: 3.5 },
+          slots: [
+            {
+              id: "herb",
+              label: "1. Лечебная трава",
+              reqCategory: ["Трава"],
+              required: true,
+            },
+            {
+              id: "berry",
+              label: "2. Экстракт ягод",
+              reqCategory: ["Ягоды"],
+              required: true,
+            },
+          ],
+        },
+        {
+          id: "alch_magick_elixir",
+          station: "alchemy",
+          name: "Эликсир Астральной концентрации",
+          category: "Зелье",
+          type: "alch",
+          baseStats: { magickPowerPct: 25, critChance: 8 },
+          slots: [
+            {
+              id: "flower",
+              label: "1. Редкий цветок",
+              reqCategory: ["Цветок"],
+              required: true,
+            },
+            {
+              id: "herb",
+              label: "2. Стабилизирующая трава",
+              reqCategory: ["Трава"],
+              required: true,
+            },
+            {
+              id: "infusion",
+              label: "3. Капля эссенции",
+              reqCategory: ["Эссенция"],
+              required: false,
+            },
+          ],
+        },
+
+        // --- 3. КУЛИНАРНЫЙ ОЧАГ ---
+        {
+          id: "cook_roasted_meat",
+          station: "cooking",
+          name: "Жареное сытное филе",
+          category: "Блюдо",
+          type: "cook",
+          baseStats: { maxHealth: 30, healthRegen: 1.0, durability: 60 },
+          slots: [
+            {
+              id: "meat",
+              label: "1. Кусок сырого мяса",
+              reqCategory: ["Сырое мясо"],
+              required: true,
+            },
+            {
+              id: "fuel",
+              label: "2. Дрова / Уголь для жарки",
+              reqCategory: ["Уголь", "Палка", "Бревно"],
+              required: true,
+            },
+          ],
+        },
+        {
+          id: "cook_predator_steak",
+          station: "cooking",
+          name: "Охотничий стейк Хищника с ягодами",
+          category: "Блюдо",
+          type: "cook",
+          baseStats: {
+            meleeDmgPct: 14,
+            maxHealth: 45,
+            staminaRegen: 1.5,
+            durability: 90,
+          },
+          slots: [
+            {
+              id: "meat",
+              label: "1. Мясо хищного зверя",
+              reqCategory: ["Сырое мясо"],
+              required: true,
+            },
+            {
+              id: "berry",
+              label: "2. Ягодный маринад",
+              reqCategory: ["Ягоды"],
+              required: true,
+            },
+            {
+              id: "spice",
+              label: "3. Пряная полевая трава",
+              reqCategory: ["Трава", "Цветок"],
+              required: true,
+            },
+          ],
+        },
+
+        // --- 4. СТОЛЯРКА И ТЕКСТИЛЬ ---
+        {
+          id: "wood_plank_craft",
+          station: "wood_textile",
+          name: "Строганая доска",
+          category: "Доска",
+          type: "basic",
+          baseStats: { durability: 40 },
+          slots: [
+            {
+              id: "log",
+              label: "Бревно",
+              reqCategory: ["Бревно"],
+              required: true,
+            },
+          ],
+        },
+        {
+          id: "textile_thread_craft",
+          station: "wood_textile",
+          name: "Скрученная нить",
+          category: "Нить",
+          type: "basic",
+          baseStats: { durability: 15 },
+          slots: [
+            {
+              id: "fiber",
+              label: "Волокно травы",
+              reqCategory: ["Волокно"],
+              required: true,
+            },
+          ],
+        },
+        {
+          id: "wood_reinforced_rod",
+          station: "wood_textile",
+          name: "Укреплённая палка / древко",
+          category: "Укреплённая палка",
+          type: "basic",
+          baseStats: { durability: 50, staminaRegen: 0.3 },
+          slots: [
+            {
+              id: "plank",
+              label: "Основа из доски",
+              reqCategory: ["Доска"],
+              required: true,
+            },
+            {
+              id: "binding",
+              label: "Обвязка нитью",
+              reqCategory: ["Нить"],
+              required: true,
+            },
+          ],
+        },
+
+        // --- 5. СЛЕСАРНЫЙ ЦЕХ ---
+        {
+          id: "metal_tube_craft",
+          station: "fittings",
+          name: "Металлическая труба (Ствольная заготовка)",
+          category: "Труба",
+          type: "basic",
+          baseStats: { rangedDamage: 15, durability: 45 },
+          slots: [
+            {
+              id: "ingot",
+              label: "Литой слиток",
+              reqCategory: ["Слиток"],
+              required: true,
+            },
+          ],
+        },
+        {
+          id: "metal_wire_craft",
+          station: "fittings",
+          name: "Тянутая проволока",
+          category: "Проволока",
+          type: "basic",
+          baseStats: { attackSpeed: 0.1, durability: 20 },
+          slots: [
+            {
+              id: "ingot",
+              label: "Слиток металла",
+              reqCategory: ["Слиток"],
+              required: true,
+            },
+          ],
+        },
+        {
+          id: "metal_sheet_craft",
+          station: "fittings",
+          name: "Кованая листовая пластина",
+          category: "Пластина",
+          type: "basic",
+          baseStats: { armor: 12, durability: 60 },
+          slots: [
+            {
+              id: "ingot",
+              label: "Слиток металла",
+              reqCategory: ["Слиток"],
+              required: true,
+            },
+          ],
+        },
+        {
+          id: "mech_spring_craft",
+          station: "fittings",
+          name: "Боевая витая пружина",
+          category: "Пружина",
+          type: "basic",
+          baseStats: { attackSpeed: 0.3, critChance: 5 },
+          slots: [
+            {
+              id: "wire",
+              label: "Проволока",
+              reqCategory: ["Проволока"],
+              required: true,
+            },
+          ],
+        },
+        {
+          id: "mech_blade_craft",
+          station: "fittings",
+          name: "Закалённое лезвие клинка",
+          category: "Лезвие",
+          type: "basic",
+          baseStats: { meleeDamage: 35, critChance: 4, durability: 75 },
+          slots: [
+            {
+              id: "sheet",
+              label: "Пластина",
+              reqCategory: ["Пластина"],
+              required: true,
+            },
+            {
+              id: "edge",
+              label: "Закалочный слиток",
+              reqCategory: ["Слиток"],
+              required: false,
+            },
+          ],
+        },
+
+        // --- 6. ОРУЖЕЙНЫЙ АРСЕНАЛ ---
+        {
+          id: "arsenal_starter_sword",
+          station: "arsenal",
+          name: "Самодельный меч бродяги (3 слота)",
+          category: "Оружие",
+          type: "basic",
+          baseStats: {
+            meleeDamage: 25,
+            attackSpeed: 1.2,
+            durability: 85,
+            critChance: 5,
+            critDamage: 110,
+          },
+          slots: [
+            {
+              id: "blade",
+              label: "1. Лезвие (или слиток)",
+              reqCategory: ["Лезвие", "Слиток"],
+              required: true,
+            },
+            {
+              id: "handle",
+              label: "2. Палка / Рукоять",
+              reqCategory: ["Палка", "Укреплённая палка"],
+              required: true,
+            },
+            {
+              id: "tie",
+              label: "3. Обвязка нитью",
+              reqCategory: ["Нить"],
+              required: false,
+            },
+          ],
+        },
+        {
+          id: "arsenal_hunter_revolver",
+          station: "arsenal",
+          name: "Охотничий револьвер (6 узлов)",
+          category: "Огнестрел",
+          type: "forge",
+          baseStats: {
+            rangedDamage: 75,
+            attackSpeed: 1.6,
+            durability: 160,
+            critChance: 12,
+            critDamage: 180,
+          },
+          slots: [
+            {
+              id: "frame",
+              label: "1. Рама из пластины",
+              reqCategory: ["Пластина", "Слиток"],
+              required: true,
+            },
+            {
+              id: "barrel",
+              label: "2. Ствол из трубы",
+              reqCategory: ["Труба"],
+              required: true,
+            },
+            {
+              id: "cylinder",
+              label: "3. Барабан",
+              reqCategory: ["Слиток"],
+              required: true,
+            },
+            {
+              id: "spring",
+              label: "4. Боевая пружина",
+              reqCategory: ["Пружина"],
+              required: true,
+            },
+            {
+              id: "grip",
+              label: "5. Рукоять",
+              reqCategory: ["Укреплённая палка", "Доска"],
+              required: true,
+            },
+            {
+              id: "ammo_load",
+              label: "6. Начальный боезапас",
+              reqCategory: ["Боеприпасы"],
+              required: false,
+            },
+          ],
+        },
+        {
+          id: "arsenal_heavy_cuirass",
+          station: "arsenal",
+          name: "Тяжёлая латная кираса (7 узлов)",
+          category: "Броня",
+          type: "forge",
+          baseStats: { armor: 45, durability: 300, maxHealth: 55 },
+          slots: [
+            {
+              id: "front",
+              label: "1. Нагрудная пластина",
+              reqCategory: ["Пластина"],
+              required: true,
+            },
+            {
+              id: "back",
+              label: "2. Спинная пластина",
+              reqCategory: ["Пластина"],
+              required: true,
+            },
+            {
+              id: "gusset",
+              label: "3. Рёберные щитки",
+              reqCategory: ["Пластина"],
+              required: true,
+            },
+            {
+              id: "buckles",
+              label: "4. Пряжки из проволоки",
+              reqCategory: ["Проволока"],
+              required: true,
+            },
+            {
+              id: "padding",
+              label: "5. Подкладка из шкуры",
+              reqCategory: ["Шкура"],
+              required: true,
+            },
+            {
+              id: "tie",
+              label: "6. Шовная нить",
+              reqCategory: ["Нить"],
+              required: true,
+            },
+            {
+              id: "charm",
+              label: "7. Оберег предков",
+              reqCategory: ["Эссенция"],
+              required: false,
+            },
+          ],
+        },
+      ];
+
+      // Все атрибуты инспектора характеристик
+      const ALL_ATTRIBUTES = [
+        { id: "meleeDamage", name: "Физический урон (Melee)", unit: "" },
+        { id: "rangedDamage", name: "Дистанционный урон (Ranged)", unit: "" },
+        { id: "attackSpeed", name: "Скорость атаки / темп", unit: "/сек" },
+        { id: "critChance", name: "Шанс критического удара", unit: "%" },
+        { id: "critDamage", name: "Множитель крит. урона", unit: "%" },
+        { id: "magickPowerPct", name: "Магическая сила", unit: "%" },
+        { id: "durability", name: "Прочность (Durability)", unit: "" },
+        { id: "armor", name: "Броня / Сопротивление", unit: "" },
+        { id: "maxHealth", name: "Макс. Здоровье", unit: "HP" },
+        { id: "healthRegen", name: "Регенерация HP", unit: "/мин" },
+        { id: "staminaRegen", name: "Регенерация выносливости", unit: "/сек" },
+        { id: "moveSpeedPct", name: "Скорость передвижения", unit: "%" },
+        { id: "envResist", name: "Сопротивление окружению", unit: "%" },
+        { id: "fireResist", name: "Защита от огня", unit: "%" },
+      ];
+
+      let currentStation = "smelter";
+      let currentRecipe = RECIPES[0];
+      let selectedSlotMaterials = {};
+      let currentDurabilityPercent = 100;
+
+      function init() {
+        updateInventoryCounter();
+        renderStations();
+        selectStation("smelter");
+      }
+
+      function updateInventoryCounter() {
+        document.getElementById("invCounter").textContent =
+          `Склад: ${playerInventory.length} позиций`;
+      }
+
+      function renderStations() {
+        const nav = document.getElementById("stationsNav");
+        nav.innerHTML = "";
+        STATIONS.forEach((st) => {
+          const btn = document.createElement("button");
+          btn.className = `station-btn ${st.id === currentStation ? "active" : ""}`;
+          btn.textContent = st.name;
+          btn.onclick = () => selectStation(st.id);
+          nav.appendChild(btn);
+        });
+      }
+
+      function selectStation(stId) {
+        currentStation = stId;
+        renderStations();
+        const stationObj = STATIONS.find((s) => s.id === stId);
+        document.getElementById("stationTitle").textContent = stationObj.name;
+
+        const filtered = RECIPES.filter((r) => r.station === stId);
+        renderRecipeList(filtered);
+        if (filtered.length > 0) {
+          selectRecipe(filtered[0]);
+        } else {
+          document.getElementById("slotsContainer").innerHTML =
+            "Нет чертежей на этом станке";
+        }
+      }
+
+      function renderRecipeList(recipes) {
+        const container = document.getElementById("recipeList");
+        container.innerHTML = "";
+        recipes.forEach((rec) => {
+          const card = document.createElement("div");
+          card.className = `recipe-card ${rec.type} ${rec.id === (currentRecipe ? currentRecipe.id : "") ? "active" : ""}`;
+          card.innerHTML = `
+      <div class="title">
+        <span>${rec.name}</span>
+        <span style="font-size:10px; color:var(--gold);">${rec.slots.length} слота</span>
+      </div>
+      <div class="meta">
+        <span>Категория: ${rec.category}</span>
+        <span>Станок: ${rec.station}</span>
+      </div>
+    `;
+          card.onclick = () => selectRecipe(rec);
+          container.appendChild(card);
+        });
+      }
+
+      function selectRecipe(rec) {
+        currentRecipe = rec;
+        selectedSlotMaterials = {};
+        currentDurabilityPercent = 100;
+        updateDurabilityUI();
+
+        document.getElementById("selectedRecipeHeader").textContent =
+          `${rec.name}`;
+        document.getElementById("blueprintStatus").textContent =
+          `Слотов: ${rec.slots.length}`;
+        document.getElementById("revealedBox").textContent = "";
+
+        renderRecipeList(RECIPES.filter((r) => r.station === currentStation));
+        renderSlots();
+        recalculateStats();
+      }
+
+      function renderSlots() {
+        const container = document.getElementById("slotsContainer");
+        container.innerHTML = "";
+
+        currentRecipe.slots.forEach((slot) => {
+          const row = document.createElement("div");
+          row.className = "slot-row";
+
+          const matching = playerInventory.filter((mat) =>
+            slot.reqCategory.includes(mat.category),
+          );
+
+          row.innerHTML = `
+      <div class="slot-header">
+        <div>
+          <span class="slot-name">${slot.label}</span>
+          <span class="slot-req">Тип: [${slot.reqCategory.join(" / ")}]</span>
+        </div>
+        ${
+          slot.required
+            ? `<span class="slot-badge-req">Обязательно</span>`
+            : `<span class="slot-badge-opt">Опционально</span>`
+        }
+      </div>
+      <select class="mat-select" id="slot_select_${slot.id}">
+        <option value="">${slot.required ? `-- Выберите ресурс (${matching.length} в наличии) --` : "-- Не установлено --"}</option>
+        ${matching
+          .map((m) => {
+            const hiddenNotice = m.hiddenTrait ? " [?] Скрытый потенциал" : "";
+            return `
+            <option value="${m.id}">
+              ${m.category} (${m.name} Т${m.tier}) — ${formatSparseStats(m.stats)}${hiddenNotice}
+            </option>
+          `;
+          })
+          .join("")}
+      </select>
+      <div class="slot-stat-preview" id="preview_stats_${slot.id}"></div>
+    `;
+
+          container.appendChild(row);
+
+          const selectEl = row.querySelector(`#slot_select_${slot.id}`);
+          selectEl.onchange = (e) => {
+            const selectedId = e.target.value;
+            const foundMat = playerInventory.find((m) => m.id === selectedId);
+            selectedSlotMaterials[slot.id] = foundMat || null;
+
+            const previewDiv = row.querySelector(`#preview_stats_${slot.id}`);
+            if (foundMat) {
+              let text = `Вклад: <strong>${formatSparseStats(foundMat.stats)}</strong>`;
+              if (foundMat.hiddenTrait) {
+                text += ` <span class="hidden-trait-tag">[?] Содержит скрытую силу (раскроется при крафте!)</span>`;
+              }
+              previewDiv.innerHTML = text;
+            } else {
+              previewDiv.innerHTML = "";
+            }
+            recalculateStats();
+          };
+        });
+      }
+
+      function formatSparseStats(stats) {
+        if (!stats) return "нет свойств";
+        const parts = [];
+        if (stats.critChance) parts.push(`+${stats.critChance}% Крит`);
+        if (stats.critDamage) parts.push(`+${stats.critDamage}% Крит.урон`);
+        if (stats.meleeDmgPct) parts.push(`+${stats.meleeDmgPct}% Melee`);
+        if (stats.rangedDmgPct) parts.push(`+${stats.rangedDmgPct}% Ranged`);
+        if (stats.attackSpeed) parts.push(`+${stats.attackSpeed} Скорость`);
+        if (stats.durability)
+          parts.push(
+            `${stats.durability > 0 ? "+" : ""}${stats.durability} Прочн.`,
+          );
+        if (stats.armor) parts.push(`+${stats.armor} Броня`);
+        if (stats.maxHealth) parts.push(`+${stats.maxHealth} HP`);
+        if (stats.healthRegen) parts.push(`+${stats.healthRegen} HP/м`);
+        if (stats.staminaRegen) parts.push(`+${stats.staminaRegen} Выносл/с`);
+        if (stats.magickPowerPct) parts.push(`+${stats.magickPowerPct}% Магия`);
+        if (stats.moveSpeedPct) parts.push(`+${stats.moveSpeedPct}% Скорость`);
+        if (stats.envResist) parts.push(`+${stats.envResist}% Окруж.`);
+        if (stats.fireResist) parts.push(`+${stats.fireResist}% Огонь`);
+        if (stats.element)
+          parts.push(
+            `Стихия: ${stats.element === "fire" ? "Огонь" : "Астрал"}`,
+          );
+        return parts.join(", ");
+      }
+
+      // ==================== РАСЧЁТ ИТОГОВЫХ ХАРАКТЕРИСТИК ====================
+      function recalculateStats() {
+        const base = { ...(currentRecipe.baseStats || {}) };
+        const bonuses = {};
+        let dominantMaterial = null;
+        let elementOverride = null;
+
+        const insertedMaterials = Object.values(selectedSlotMaterials).filter(
+          Boolean,
+        );
+
+        let calculatedTier = 1;
+        if (insertedMaterials.length > 0) {
+          const totalTierSum = insertedMaterials.reduce(
+            (acc, m) => acc + m.tier,
+            0,
+          );
+          calculatedTier = Math.max(
+            1,
+            Math.round(totalTierSum / insertedMaterials.length),
+          );
+        }
+
+        const tierMultipliers = { 1: 1.0, 2: 1.35, 3: 1.8, 4: 2.3, 5: 3.0 };
+        const tierMult = tierMultipliers[calculatedTier] || 1.0;
+
+        insertedMaterials.forEach((mat) => {
+          if (!dominantMaterial) dominantMaterial = mat;
+
+          Object.entries(mat.stats).forEach(([k, v]) => {
+            if (k === "element") {
+              elementOverride = v;
+            } else {
+              bonuses[k] = (bonuses[k] || 0) + v;
+            }
+          });
+        });
+
+        const wearPenalty = currentDurabilityPercent <= 0 ? 0.2 : 1.0;
+
+        const finalSheet = {};
+        ALL_ATTRIBUTES.forEach((attr) => {
+          let baseVal = base[attr.id] || 0;
+          const bonusVal = bonuses[attr.id] || 0;
+
+          if (baseVal > 0) {
+            baseVal = Math.round(baseVal * tierMult);
+          }
+
+          if (attr.id === "meleeDamage" && baseVal > 0) {
+            const pct = (bonuses.meleeDmgPct || 0) / 100;
+            const rawTotal = Math.round(baseVal * (1 + pct));
+            finalSheet[attr.id] = {
+              base: baseVal,
+              bonus: bonusVal,
+              total: Math.round(rawTotal * wearPenalty),
+              hasEffect: baseVal > 0 || bonuses.meleeDmgPct > 0,
+            };
+          } else if (attr.id === "rangedDamage" && baseVal > 0) {
+            const pct = (bonuses.rangedDmgPct || 0) / 100;
+            const rawTotal = Math.round(baseVal * (1 + pct));
+            finalSheet[attr.id] = {
+              base: baseVal,
+              bonus: bonusVal,
+              total: Math.round(rawTotal * wearPenalty),
+              hasEffect: baseVal > 0 || bonuses.rangedDmgPct > 0,
+            };
+          } else {
+            finalSheet[attr.id] = {
+              base: baseVal,
+              bonus: bonusVal,
+              total: Math.round((baseVal + bonusVal) * wearPenalty),
+              hasEffect: baseVal !== 0 || bonusVal !== 0,
+            };
+          }
+        });
+
+        // Рендер таблицы с затемнением неактивных строк
+        const sheetContainer = document.getElementById("statSheet");
+        sheetContainer.innerHTML = "";
+
+        ALL_ATTRIBUTES.forEach((attr) => {
+          const entry = finalSheet[attr.id];
+          const isLit = entry.hasEffect && entry.total !== 0;
+
+          const row = document.createElement("div");
+          row.className = `stat-row ${isLit ? "active-stat" : "dimmed-stat"}`;
+
+          let valDisplay = `${entry.total} ${attr.unit}`;
+          if (entry.bonus > 0 && entry.base > 0) {
+            valDisplay = `${entry.total} ${attr.unit} <span style="font-size:10px; opacity:0.8;">(${entry.base} + ${entry.bonus})</span>`;
+          }
+
+          row.innerHTML = `
+      <span class="stat-name">${attr.name}</span>
+      <span class="stat-val">${valDisplay}</span>
+    `;
+          sheetContainer.appendChild(row);
+        });
+
+        const powerScore = Math.round(
+          (calculatedTier * 22 +
+            (finalSheet.meleeDamage.total ||
+              finalSheet.rangedDamage.total ||
+              finalSheet.armor.total ||
+              0) *
+              0.45) *
+            wearPenalty,
+        );
+
+        const nameBox = document.getElementById("previewItemName");
+        const tierBadge = document.getElementById("previewTierBadge");
+        const gearScoreBox = document.getElementById("previewGearScore");
+        const formulaBox = document.getElementById("previewItemFormula");
+
+        tierBadge.textContent = `Тир ${calculatedTier}`;
+        gearScoreBox.textContent = `Рейтинг снаряжения (Item Power): ${powerScore}`;
+
+        if (dominantMaterial) {
+          let elemWord =
+            elementOverride === "fire"
+              ? " [Пламя]"
+              : elementOverride === "magick"
+                ? " [Астрал]"
+                : "";
+          nameBox.textContent = `${currentRecipe.name} «${dominantMaterial.name}»${elemWord}`;
+          formulaBox.textContent = `Узлов: ${insertedMaterials.length}/${currentRecipe.slots.length} • Ведущий ресурс: ${dominantMaterial.category} (${dominantMaterial.name})`;
+        } else {
+          nameBox.textContent = currentRecipe.name;
+          formulaBox.textContent = "Выберите сырьё для расчёта";
+        }
+
+        window.currentFinalStats = finalSheet;
+        window.currentElement = elementOverride;
+        window.currentTier = calculatedTier;
+      }
+
+      // ==================== ИЗНОС И РЕМОНТ ====================
+      function updateDurabilityUI() {
+        const fill = document.getElementById("durabilityFill");
+        const txt = document.getElementById("durabilityPercentText");
+
+        fill.style.width = `${currentDurabilityPercent}%`;
+        if (currentDurabilityPercent > 50) {
+          fill.style.background = "var(--green)";
+          txt.style.color = "var(--green)";
+          txt.textContent = `${currentDurabilityPercent}% (Отличное)`;
+        } else if (currentDurabilityPercent > 0) {
+          fill.style.background = "var(--gold)";
+          txt.style.color = "var(--gold)";
+          txt.textContent = `${currentDurabilityPercent}% (Изношено!)`;
+        } else {
+          fill.style.background = "var(--red)";
+          txt.style.color = "var(--red)";
+          txt.textContent = `0% (СЛОМАНО! -80% к статам)`;
+        }
+        recalculateStats();
+      }
+
+      document.getElementById("useItemBtn").onclick = () => {
+        currentDurabilityPercent = Math.max(0, currentDurabilityPercent - 15);
+        updateDurabilityUI();
+        const log = document.getElementById("combatLog");
+        log.innerHTML =
+          `<span style="color:var(--gold)">[ИЗНОС] Прочность предмета упала до ${currentDurabilityPercent}%</span><br>` +
+          log.innerHTML;
+      };
+
+      document.getElementById("repairItemBtn").onclick = () => {
+        const tier = window.currentTier || 1;
+        const cost = tier * 30;
+        currentDurabilityPercent = 100;
+        updateDurabilityUI();
+        const log = document.getElementById("combatLog");
+        log.innerHTML =
+          `<span style="color:var(--green)">[РЕМОНТ] Предмет Т${tier} починен. Затрачено ресурсов на сумму ~${cost} шестерней/эссенций.</span><br>` +
+          log.innerHTML;
+      };
+
+      // ==================== КРАФТ С РАСКРЫТИЕМ СКРЫТОГО ПОТЕНЦИАЛА ====================
+      document.getElementById("craftBtn").onclick = () => {
+        const missing = currentRecipe.slots.filter(
+          (s) => s.required && !selectedSlotMaterials[s.id],
+        );
+        if (missing.length > 0) {
+          alert(
+            `Заполните обязательные слоты:\n- ${missing.map((m) => m.label).join("\n- ")}`,
+          );
+          return;
+        }
+
+        const craftedName =
+          document.getElementById("previewItemName").textContent;
+        const craftedTier = window.currentTier;
+        const log = document.getElementById("combatLog");
+
+        const exportedStats = {};
+        Object.entries(window.currentFinalStats).forEach(([k, entry]) => {
+          if (entry.total !== 0) exportedStats[k] = entry.total;
+        });
+        if (window.currentElement)
+          exportedStats.element = window.currentElement;
+
+        // Проверка скрытых свойств сырья!
+        let revealedTraits = [];
+        Object.values(selectedSlotMaterials).forEach((mat) => {
+          if (mat && mat.hiddenTrait) {
+            // Раскрытие скрытого свойства!
+            const trait = mat.hiddenTrait;
+            revealedTraits.push(
+              `${trait.name} (+${trait.val} к ${trait.stat})`,
+            );
+            exportedStats[trait.stat] =
+              (exportedStats[trait.stat] || 0) + trait.val;
+          }
+        });
+
+        const newItem = {
+          id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+          category: currentRecipe.category,
+          name: craftedName,
+          tier: craftedTier,
+          stats: exportedStats,
+        };
+
+        playerInventory.unshift(newItem);
+        updateInventoryCounter();
+
+        let logMsg = `<span style="color:var(--green)">[СОЗДАНО] Получен: ${newItem.category} (${newItem.name} Т${newItem.tier})!</span>`;
+        if (revealedTraits.length > 0) {
+          logMsg += `<br><span style="color:var(--purple)">✨ [РАСКРЫТ СКРЫТЫЙ ПОТЕНЦИАЛ]: ${revealedTraits.join(", ")}! Статы усилены!</span>`;
+          document.getElementById("revealedBox").textContent =
+            `✨ Раскрыто при обработке: ${revealedTraits.join(", ")}`;
+        } else {
+          document.getElementById("revealedBox").textContent = "";
+        }
+
+        log.innerHTML = logMsg + "<br>" + log.innerHTML;
+        renderSlots();
+      };
+
+      // ==================== БОЕВОЙ ТЕСТ ПО МАНЕКЕНУ ====================
+      document.getElementById("testHitBtn").onclick = () => {
+        const log = document.getElementById("combatLog");
+        const stats = window.currentFinalStats;
+        if (!stats) return;
+
+        const dmgMelee = stats.meleeDamage.total;
+        const dmgRanged = stats.rangedDamage.total;
+        let dmg = Math.max(dmgMelee, dmgRanged);
+
+        if (dmg === 0) {
+          log.innerHTML =
+            `<span style="color:var(--red)">Этот предмет не наносит прямого урона (еда, зелье или промежуточная заготовка)</span><br>` +
+            log.innerHTML;
+          return;
+        }
+
+        const dummyType = document.getElementById("dummyType").value;
+        const dummyArmor =
+          Number(document.getElementById("dummyArmor").value) || 0;
+        const dummyWeakness = document.getElementById("dummyWeakness").value;
+        const element = window.currentElement;
+
+        if (dummyType === "ghost") {
+          if (!element && stats.magickPowerPct.total === 0) {
+            log.innerHTML =
+              `<span style="color:var(--text-muted)">[ИММУНИТЕТ] Призрак не получает урона от обычного физ. оружия! Нужна магия или эссенция.</span><br>` +
+              log.innerHTML;
+            return;
+          }
+        }
+
+        let isCrit = Math.random() * 100 < stats.critChance.total;
+        let critMult = isCrit ? stats.critDamage.total / 100 : 1.0;
+        let calculatedDmg = Math.round(dmg * critMult);
+
+        let mitigated = Math.round(calculatedDmg * (1 - dummyArmor / 100));
+
+        if (element && element === dummyWeakness) {
+          mitigated = Math.round(mitigated * 1.5);
+          log.innerHTML =
+            `<span style="color:var(--gold)">[УЯЗВИМОСТЬ К СТИХИИ] +50% урона!</span><br>` +
+            log.innerHTML;
+        }
+
+        log.innerHTML =
+          `<span>Удар/Выстрел Т${window.currentTier}: <strong>${mitigated}</strong> урона ${isCrit ? '<span style="color:var(--gold)">[КРИТ!]</span>' : ""} (Прочность: ${currentDurabilityPercent}%)</span><br>` +
+          log.innerHTML;
+      };
+
+      init();
+    </script>
+  </body>
+</html>
